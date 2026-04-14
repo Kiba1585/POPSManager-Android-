@@ -14,4 +14,3 @@ public class PathsServiceAndroid : IPathsService
         return result?.FullPath;
     }
 }
-POPSManager.Android.Services
