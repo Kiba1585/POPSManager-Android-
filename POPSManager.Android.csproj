@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0-android</TargetFrameworks>
+    <UseMaui>true</UseMaui>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
+  </ItemGroup>
+
+</Project>
