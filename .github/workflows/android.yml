@@ -1,0 +1,37 @@
+name: Build Android (MAUI)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Install MAUI workload
+      run: dotnet workload install maui
+
+    - name: Restore NuGet packages
+      run: dotnet restore
+
+    - name: Build Android APK
+      run: dotnet build POPSManager.Android/POPSManager.Android.csproj -c Release -f net8.0-android
+
+    - name: Publish Android APK
+      run: dotnet publish POPSManager.Android/POPSManager.Android.csproj -c Release -f net8.0-android --output ./publish
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: POPSManager-Android
+        path: publish/*.apk
