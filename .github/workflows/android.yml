@@ -13,24 +13,33 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install .NET 8
+    # 🔥 Eliminar .NET 10 preinstalado (causa NETSDK1202)
+    - name: Remove preinstalled .NET
+      run: |
+        Remove-Item -Recurse -Force "C:\Program Files\dotnet"
+      shell: pwsh
+
+    # ✔ Instalar .NET 8 limpio
+    - name: Install .NET 8 SDK
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
+    # ✔ Instalar MAUI workload
     - name: Install MAUI workload
       run: dotnet workload install maui
 
-    - name: Restore NuGet packages
-      run: dotnet restore
+    # ✔ Restaurar proyectos
+    - name: Restore solution
+      run: dotnet restore POPSManager.sln
 
-    # 🔐 Decodificar el keystore desde el secreto Base64
+    # 🔐 Decodificar keystore desde secreto Base64
     - name: Decode keystore
       run: |
         echo "$env:KEYSTORE_BASE64" | base64 -d > popsmanager.keystore
       shell: pwsh
 
-    # 🔨 Compilar y firmar el APK
+    # 🔨 Compilar y firmar APK
     - name: Build Signed APK
       run: |
         dotnet publish POPSManager.Android/POPSManager.Android.csproj `
@@ -43,7 +52,7 @@ jobs:
           /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD `
           --output ./publish
 
-    # 📦 Subir el APK firmado como artefacto
+    # 📦 Subir APK firmado
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
