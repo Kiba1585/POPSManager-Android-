@@ -24,14 +24,28 @@ jobs:
     - name: Restore NuGet packages
       run: dotnet restore
 
-    - name: Build Android APK
-      run: dotnet build POPSManager.Android/POPSManager.Android.csproj -c Release -f net8.0-android
+    # 🔐 Decodificar el keystore desde el secreto Base64
+    - name: Decode keystore
+      run: |
+        echo "$env:KEYSTORE_BASE64" | base64 -d > popsmanager.keystore
+      shell: pwsh
 
-    - name: Publish Android APK
-      run: dotnet publish POPSManager.Android/POPSManager.Android.csproj -c Release -f net8.0-android --output ./publish
+    # 🔨 Compilar y firmar el APK
+    - name: Build Signed APK
+      run: |
+        dotnet publish POPSManager.Android/POPSManager.Android.csproj `
+          -c Release `
+          -f net8.0-android `
+          /p:AndroidKeyStore=true `
+          /p:AndroidSigningKeyStore=popsmanager.keystore `
+          /p:AndroidSigningKeyAlias=$env:KEY_ALIAS `
+          /p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
+          /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD `
+          --output ./publish
 
+    # 📦 Subir el APK firmado como artefacto
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: POPSManager-Android
+        name: POPSManager-Android-Signed
         path: publish/*.apk
