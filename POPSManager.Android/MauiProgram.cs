@@ -6,7 +6,6 @@ using POPSManager.Android.Services;
 
 // Core services
 using POPSManager.Core.Services;
-using POPSManager.Core;
 
 // Views & ViewModels
 using POPSManager.Android.Views;
