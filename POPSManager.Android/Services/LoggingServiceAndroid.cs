@@ -1,6 +1,6 @@
 using POPSManager.Core.Services;
 
-namespace POPSManager.Android;
+namespace POPSManager.Android.Services;
 
 public class LoggingServiceAndroid : ILoggingService
 {
