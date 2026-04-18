@@ -2,7 +2,7 @@ namespace POPSManager.Android;
 
 public partial class App : Application
 {
-    public App(HomePage home)
+    public App(POPSManager.Android.Views.HomePage home)
     {
         InitializeComponent();
         MainPage = new NavigationPage(home);
