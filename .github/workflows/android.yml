@@ -10,37 +10,41 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout del repositorio
       uses: actions/checkout@v4
 
     # 🔥 Eliminar .NET 10 preinstalado (causa NETSDK1202)
-    - name: Remove preinstalled .NET
-      run: |
-        Remove-Item -Recurse -Force "C:\Program Files\dotnet"
+    - name: Eliminar .NET preinstalado
+      run: Remove-Item -Recurse -Force "C:\Program Files\dotnet"
       shell: pwsh
 
     # ✔ Instalar .NET 8 limpio
-    - name: Install .NET 8 SDK
+    - name: Instalar SDK de .NET 8
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
     # ✔ Instalar MAUI workload
-    - name: Install MAUI workload
+    - name: Instalar carga de trabajo MAUI
       run: dotnet workload install maui
 
     # ✔ Restaurar proyectos
-    - name: Restore solution
+    - name: Restaurar solución
       run: dotnet restore POPSManager.sln
 
-    # 🔐 Decodificar keystore desde secreto Base64
-    - name: Decode keystore
+    # 🔐 Decodificar keystore desde secreto Base64 (CORREGIDO)
+    - name: Decodificar Keystore
       run: |
-        echo "$env:KEYSTORE_BASE64" | base64 -d > popsmanager.keystore
+        Write-Host "🛠️ Procesando archivo de firmas..."
+        # Convertir cadena Base64 a arreglo de bytes
+        $bytes = [System.Convert]::FromBase64String($env:KEYSTORE_BASE64)
+        # Escribir bytes directamente en el archivo (evita corrupción por codificación de texto)
+        [System.IO.File]::WriteAllBytes("$PWD\popsmanager.keystore", $bytes)
+        Write-Host "✅ Archivo popsmanager.keystore generado correctamente."
       shell: pwsh
 
     # 🔨 Compilar y firmar APK
-    - name: Build Signed APK
+    - name: Compilar APK Firmado
       run: |
         dotnet publish POPSManager.Android/POPSManager.Android.csproj `
           -c Release `
@@ -51,9 +55,13 @@ jobs:
           /p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
           /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD `
           --output ./publish
+      env:
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # 📦 Subir APK firmado
-    - name: Upload APK artifact
+    - name: Subir artefacto APK
       uses: actions/upload-artifact@v4
       with:
         name: POPSManager-Android-Signed
