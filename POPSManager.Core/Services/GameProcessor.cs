@@ -15,22 +15,26 @@ public class GameProcessor
 
     public async Task<List<GameProgressItem>> DetectGamesAsync(string folder)
     {
-        var files = Directory.GetFiles(folder, "*.bin", SearchOption.AllDirectories)
-                             .Concat(Directory.GetFiles(folder, "*.iso", SearchOption.AllDirectories))
-                             .ToList();
-
-        var list = new List<GameProgressItem>();
-
-        foreach (var file in files)
+        // Ejecutar la detección en un hilo de fondo para evitar bloquear la UI
+        return await Task.Run(() =>
         {
-            list.Add(new GameProgressItem
-            {
-                Name = NameCleaner.Clean(Path.GetFileNameWithoutExtension(file)),
-                Status = "Pendiente"
-            });
-        }
+            var files = Directory.GetFiles(folder, "*.bin", SearchOption.AllDirectories)
+                                 .Concat(Directory.GetFiles(folder, "*.iso", SearchOption.AllDirectories))
+                                 .ToList();
 
-        return list;
+            var list = new List<GameProgressItem>();
+
+            foreach (var file in files)
+            {
+                list.Add(new GameProgressItem
+                {
+                    Name = NameCleaner.Clean(Path.GetFileNameWithoutExtension(file)),
+                    Status = "Pendiente"
+                });
+            }
+
+            return list;
+        });
     }
 
     public async Task ProcessGamesAsync(string folder, IList<GameProgressItem> games)
@@ -38,9 +42,13 @@ public class GameProcessor
         foreach (var game in games)
         {
             game.Status = "Procesando...";
-            await Task.Delay(300); // Simulación
+            _log.Log($"Procesando: {game.Name}");
+
+            // Simulación de trabajo real
+            await Task.Delay(300);
 
             game.Status = "Completado";
+            _log.Log($"Completado: {game.Name}");
         }
 
         _notify.Show("Procesamiento completado.");
