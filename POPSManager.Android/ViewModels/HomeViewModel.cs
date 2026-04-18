@@ -22,7 +22,14 @@ public class HomeViewModel : BindableObject
     public string StatusMessage
     {
         get => _statusMessage;
-        set { _statusMessage = value; OnPropertyChanged(); }
+        set
+        {
+            if (_statusMessage != value)
+            {
+                _statusMessage = value;
+                OnPropertyChanged();
+            }
+        }
     }
 
     public HomeViewModel(IPathsService paths, GameProcessor processor)
