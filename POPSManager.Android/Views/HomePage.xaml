@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="POPSManager.Android.HomePage"
+             x:Class="POPSManager.Android.Views.HomePage"
              Title="POPSManager Android">
 
     <VerticalStackLayout Padding="20" Spacing="15">
