@@ -1,4 +1,4 @@
-namespace POPSManager.Android;
+namespace POPSManager.Android.Views;
 
 public partial class HomePage : ContentPage
 {
