@@ -3,7 +3,7 @@ using System.Windows.Input;
 using POPSManager.Core.Models;
 using POPSManager.Core.Services;
 
-namespace POPSManager.Android;
+namespace POPSManager.Android.ViewModels;
 
 public class HomeViewModel : BindableObject
 {
