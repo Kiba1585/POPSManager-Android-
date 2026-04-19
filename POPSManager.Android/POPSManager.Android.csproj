@@ -7,8 +7,29 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- MAUI Controls ES OBLIGATORIO EN .NET 8 -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.100" />
+  </ItemGroup>
+
+  <!-- Referencia al proyecto Core -->
   <ItemGroup>
     <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
+  </ItemGroup>
+
+  <!-- INCLUIR TODAS LAS CLASES DEL PROYECTO ANDROID -->
+  <ItemGroup>
+    <Compile Include="Services\**\*.cs" />
+    <Compile Include="Views\**\*.cs" />
+    <Compile Include="ViewModels\**\*.cs" />
+    <Compile Include="App.xaml.cs" />
+    <Compile Include="MauiProgram.cs" />
+  </ItemGroup>
+
+  <!-- INCLUIR TODOS LOS XAML -->
+  <ItemGroup>
+    <MauiXaml Include="App.xaml" />
+    <MauiXaml Include="Views\**\*.xaml" />
   </ItemGroup>
 
 </Project>
