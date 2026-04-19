@@ -11,6 +11,8 @@ public static class NameCleaner
                    .Replace("-", " ")
                    .Trim();
 
-        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(name.ToLower());
+        return System.Globalization.CultureInfo.CurrentCulture
+            .TextInfo
+            .ToTitleCase(name.ToLower());
     }
 }
