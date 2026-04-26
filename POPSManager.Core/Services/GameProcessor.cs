@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using POPSManager.Core.Models;
 
 namespace POPSManager.Core.Services;
@@ -6,51 +11,42 @@ public class GameProcessor
 {
     private readonly ILoggingService _log;
     private readonly INotificationService _notify;
+    private readonly ConverterService _converter;
 
-    public GameProcessor(ILoggingService log, INotificationService notify)
+    public GameProcessor(ILoggingService log, INotificationService notify, ConverterService converter)
     {
         _log = log;
         _notify = notify;
+        _converter = converter;
     }
 
     public async Task<List<GameProgressItem>> DetectGamesAsync(string folder)
     {
-        // Ejecutar la detección en un hilo de fondo para evitar bloquear la UI
         return await Task.Run(() =>
         {
-            var files = Directory.GetFiles(folder, "*.bin", SearchOption.AllDirectories)
-                                 .Concat(Directory.GetFiles(folder, "*.iso", SearchOption.AllDirectories))
-                                 .ToList();
-
-            var list = new List<GameProgressItem>();
-
-            foreach (var file in files)
-            {
-                list.Add(new GameProgressItem
+            var files = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
+                .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".vcd", StringComparison.OrdinalIgnoreCase))
+                .Select(f => new GameProgressItem
                 {
-                    Name = NameCleaner.Clean(Path.GetFileNameWithoutExtension(file)),
+                    Name = Path.GetFileNameWithoutExtension(f),
                     Status = "Pendiente"
-                });
-            }
+                })
+                .ToList();
 
-            return list;
+            return files;
         });
     }
 
-    public async Task ProcessGamesAsync(string folder, IList<GameProgressItem> games)
+    public async Task ProcessGamesAsync(string folder, IList<GameProgressItem> games, string outputFolder)
     {
+        await _converter.ConvertFolderAsync(folder, outputFolder);
+
         foreach (var game in games)
         {
-            game.Status = "Procesando...";
-            _log.Log($"Procesando: {game.Name}");
-
-            // Simulación de trabajo real
-            await Task.Delay(300);
-
             game.Status = "Completado";
-            _log.Log($"Completado: {game.Name}");
         }
-
-        _notify.Show("Procesamiento completado.");
     }
 }
