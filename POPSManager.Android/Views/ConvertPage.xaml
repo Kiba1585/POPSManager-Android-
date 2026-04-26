@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="POPSManager.Android.Views.ConvertPage"
+             Title="Convertir Juegos">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+
+            <Label Text="Origen" FontSize="16" TextColor="White" />
+            <Entry Text="{Binding SourceFolder}" Placeholder="Carpeta de origen" BackgroundColor="#2D2D2D" TextColor="White" />
+            <Button Text="Seleccionar origen" Command="{Binding SelectSourceCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+
+            <Label Text="Destino" FontSize="16" TextColor="White" />
+            <Entry Text="{Binding DestFolder}" Placeholder="Carpeta de destino" BackgroundColor="#2D2D2D" TextColor="White" />
+            <Button Text="Seleccionar destino" Command="{Binding SelectDestCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+
+            <Button Text="Convertir archivos" Command="{Binding ConvertCommand}" BackgroundColor="#2FA0D8" TextColor="White" />
+
+            <Label Text="{Binding Status}" FontSize="14" TextColor="#CCCCCC" />
+
+            <CollectionView ItemsSource="{Binding Files}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <HorizontalStackLayout Spacing="5">
+                            <Label Text="{Binding Icon}" />
+                            <Label Text="{Binding Name}" TextColor="White" />
+                        </HorizontalStackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
