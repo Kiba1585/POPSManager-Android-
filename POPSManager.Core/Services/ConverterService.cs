@@ -1,41 +1,101 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace POPSManager.Core.Services;
 
 public class ConverterService
 {
-    public async Task ConvertFolder(string sourceFolder, string outputFolder)
+    private readonly Action<string>? _log;
+    private readonly Action<string>? _setStatus;
+
+    private const int SectorSize = 2352;
+    private const int UserDataSize = 2048;
+    private const int HeaderSize = 0x800;
+    private const int BufferSize = 1024 * 1024;
+
+    public ConverterService(Action<string>? log = null, Action<string>? setStatus = null)
+    {
+        _log = log;
+        _setStatus = setStatus;
+    }
+
+    public async Task ConvertFolderAsync(string sourceFolder, string outputFolder)
     {
         if (!Directory.Exists(sourceFolder))
-            throw new DirectoryNotFoundException($"Source folder not found: {sourceFolder}");
+            throw new DirectoryNotFoundException($"Origen no encontrado: {sourceFolder}");
 
-        if (!Directory.Exists(outputFolder))
-            Directory.CreateDirectory(outputFolder);
+        Directory.CreateDirectory(outputFolder);
 
-        var files = Directory.GetFiles(sourceFolder, "*.*", SearchOption.TopDirectoryOnly);
+        var files = Directory.GetFiles(sourceFolder, "*.*")
+            .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
+                        f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
+                        f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(f => f)
+            .ToArray();
 
         foreach (var file in files)
         {
-            if (file.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
-                file.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
-                file.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                await ConvertFile(file, outputFolder);
+                await ConvertToVcdAsync(file, outputFolder);
+            }
+            catch (Exception ex)
+            {
+                _log?.Invoke($"ERROR convirtiendo {file}: {ex.Message}");
             }
         }
     }
 
-    public async Task ConvertFile(string inputPath, string outputFolder)
+    private async Task ConvertToVcdAsync(string inputPath, string outputFolder)
     {
-        string fileName = Path.GetFileNameWithoutExtension(inputPath);
-        string outputPath = Path.Combine(outputFolder, fileName + ".vcd");
+        string name = Path.GetFileNameWithoutExtension(inputPath);
+        string outputPath = Path.Combine(outputFolder, name + ".vcd");
 
-        // Simulación de trabajo
-        await Task.Delay(300);
+        await ConvertPs1ToVcdAsync(inputPath, outputPath, name);
+    }
 
-        // Crear archivo vacío para que compile
-        File.WriteAllText(outputPath, "VCD-DATA");
+    private async Task ConvertPs1ToVcdAsync(string inputPath, string outputPath, string name)
+    {
+        await using var input = File.OpenRead(inputPath);
+        await using var output = File.Create(outputPath);
+
+        byte[] header = new byte[HeaderSize];
+        Array.Copy(Encoding.ASCII.GetBytes("PSX"), header, 3);
+        await output.WriteAsync(header, 0, header.Length);
+
+        byte[] sector = new byte[SectorSize];
+        byte[] outputBuffer = new byte[BufferSize];
+        int bufferPos = 0;
+        long totalSectors = input.Length / SectorSize;
+        long processed = 0;
+
+        while (true)
+        {
+            int read = await input.ReadAsync(sector, 0, SectorSize);
+            if (read == 0) break;
+            if (read != SectorSize) break;
+
+            if (bufferPos + UserDataSize > outputBuffer.Length)
+            {
+                await output.WriteAsync(outputBuffer, 0, bufferPos);
+                bufferPos = 0;
+            }
+
+            Buffer.BlockCopy(sector, 24, outputBuffer, bufferPos, UserDataSize);
+            bufferPos += UserDataSize;
+            processed++;
+
+            if (processed % 200 == 0)
+            {
+                int percent = (int)((processed / (double)totalSectors) * 100);
+                _setStatus?.Invoke($"Convirtiendo {name}: {percent}%");
+            }
+        }
+
+        if (bufferPos > 0)
+            await output.WriteAsync(outputBuffer, 0, bufferPos);
     }
 }
