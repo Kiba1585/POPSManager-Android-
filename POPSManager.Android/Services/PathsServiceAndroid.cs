@@ -1,29 +1,37 @@
+using CommunityToolkit.Maui.Storage;
 using POPSManager.Core.Services;
 
 namespace POPSManager.Android.Services;
 
 public class PathsServiceAndroid : IPathsService
 {
-    public string RootFolder { get; set; } = "";
-    public string PopsFolder => Path.Combine(RootFolder, "POPS");
-    public string AppsFolder => Path.Combine(RootFolder, "APPS");
-    public string CfgFolder => Path.Combine(RootFolder, "CFG");
-    public string ArtFolder => Path.Combine(RootFolder, "ART");
-    public string DvdFolder => Path.Combine(RootFolder, "DVD");
+    public string RootFolder { get; set; } = "/storage/emulated/0/POPSManager";
+    public string PopsFolder => System.IO.Path.Combine(RootFolder, "POPS");
+    public string AppsFolder => System.IO.Path.Combine(RootFolder, "APPS");
+    public string CfgFolder => System.IO.Path.Combine(RootFolder, "CFG");
+    public string ArtFolder => System.IO.Path.Combine(RootFolder, "ART");
+    public string DvdFolder => System.IO.Path.Combine(RootFolder, "DVD");
     public string PopstarterElfPath { get; set; } = "";
     public string PopstarterPs2ElfPath { get; set; } = "";
     public string TempFolder => FileSystem.CacheDirectory;
 
-    public Task<string?> SelectFolderAsync()
+    public async Task<string?> SelectFolderAsync()
     {
-        // MAUI no tiene FolderPicker nativo. Usamos FilePicker para que el usuario seleccione un archivo dentro de la carpeta deseada.
-        // Para una experiencia completa, se necesitaría un plugin como CommunityToolkit.Maui FolderPicker.
-        return Task.FromResult<string?>(null);
+        var result = await FolderPicker.Default.PickAsync(default);
+        return result?.Folder?.Path;
     }
 
-    public Task<string?> SelectFileAsync(string filter)
+    public async Task<string?> SelectFileAsync(string filter = "*/*")
     {
-        return Task.FromResult<string?>(null);
+        var result = await FilePicker.Default.PickAsync(new PickOptions
+        {
+            PickerTitle = "Selecciona un archivo",
+            FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+            {
+                { DevicePlatform.Android, new[] { filter } }
+            })
+        });
+        return result?.FullPath;
     }
 
     public void SetElfPath(string path) => PopstarterElfPath = path;
