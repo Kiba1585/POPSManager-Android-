@@ -1,9 +1,11 @@
+namespace POPSManager.Android;
+
 public partial class App : Application
 {
-    public App(NotificationService notifyService, POPSManager.Android.Views.HomePage home)
+    public App(NotificationService notifyService)
     {
         InitializeComponent();
-        MainPage = new NavigationPage(home);
+        MainPage = new AppShell();
 
         notifyService.OnShowToast = (msg, type) =>
         {
