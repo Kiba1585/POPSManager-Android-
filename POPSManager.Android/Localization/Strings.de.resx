@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Fenster und Titel -->
+  <data name="Title_ProgressWindow" xml:space="preserve">
+    <value>Fortschritt</value>
+  </data>
+  <data name="Title_CheatSettings" xml:space="preserve">
+    <value>Cheat-Einstellungen</value>
+  </data>
+
+  <!-- Zustände und Aktionen -->
+  <data name="Label_ProcessingGames" xml:space="preserve">
+    <value>Spiele werden verarbeitet…</value>
+  </data>
+  <data name="Label_Completed" xml:space="preserve">
+    <value>Abgeschlossen</value>
+  </data>
+  <data name="Label_Error" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+
+  <!-- Fortschrittsmeldungen -->
+  <data name="Progress_Starting" xml:space="preserve">
+    <value>Startet…</value>
+  </data>
+  <data name="Progress_Preparing" xml:space="preserve">
+    <value>Vorbereitung…</value>
+  </data>
+  <data name="Progress_CopyingDisc" xml:space="preserve">
+    <value>Kopiere Disc {0}…</value>
+  </data>
+  <data name="Progress_DownloadingCover" xml:space="preserve">
+    <value>Cover wird heruntergeladen…</value>
+  </data>
+  <data name="Progress_GeneratingELF" xml:space="preserve">
+    <value>ELF wird generiert…</value>
+  </data>
+  <data name="Progress_GeneratingCheats" xml:space="preserve">
+    <value>Cheats werden generiert…</value>
+  </data>
+  <data name="Progress_GeneratingDiscsTxt" xml:space="preserve">
+    <value>DISCS.TXT wird generiert…</value>
+  </data>
+  <data name="Progress_CopyingISO" xml:space="preserve">
+    <value>ISO wird kopiert…</value>
+  </data>
+
+  <!-- Dialoge -->
+  <data name="Message_SettingsSaved" xml:space="preserve">
+    <value>Einstellungen erfolgreich gespeichert.</value>
+  </data>
+
+  <!-- Benachrichtigungen -->
+  <data name="Notification_Success" xml:space="preserve">
+    <value>Erfolg</value>
+  </data>
+  <data name="Notification_Error" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="Notification_Warning" xml:space="preserve">
+    <value>Warnung</value>
+  </data>
+  <data name="Notification_Info" xml:space="preserve">
+    <value>Information</value>
+  </data>
+  <data name="Notification_Message" xml:space="preserve">
+    <value>Nachricht</value>
+  </data>
+
+  <!-- Cheats Settings -->
+  <data name="Cheat_ModeLabel" xml:space="preserve">
+    <value>Generierungsmodus</value>
+  </data>
+  <data name="Cheat_ModeDisabled" xml:space="preserve">
+    <value>Deaktiviert</value>
+  </data>
+  <data name="Cheat_ModeAutoPal" xml:space="preserve">
+    <value>Automatisch für PAL-Spiele</value>
+  </data>
+  <data name="Cheat_ModeAsk" xml:space="preserve">
+    <value>Jedes Mal fragen</value>
+  </data>
+  <data name="Cheat_ModeManual" xml:space="preserve">
+    <value>Manuelle Auswahl vor Verarbeitung</value>
+  </data>
+  <data name="Cheat_AdvancedLabel" xml:space="preserve">
+    <value>Erweiterte Optionen</value>
+  </data>
+  <data name="Cheat_AutoFixes" xml:space="preserve">
+    <value>Automatische Spiele-Fixes verwenden</value>
+  </data>
+  <data name="Cheat_EngineFixes" xml:space="preserve">
+    <value>Engine-Fixes verwenden</value>
+  </data>
+  <data name="Cheat_HeuristicFixes" xml:space="preserve">
+    <value>Heuristische Fixes verwenden</value>
+  </data>
+  <data name="Cheat_DatabaseFixes" xml:space="preserve">
+    <value>Fixes aus GameDatabase verwenden</value>
+  </data>
+  <data name="Cheat_CustomCheats" xml:space="preserve">
+    <value>Benutzerdefinierte Cheats erlauben</value>
+  </data>
+
+  <!-- Cheat Editor -->
+  <data name="CheatEditor_WindowTitle" xml:space="preserve">
+    <value>Cheat-Editor</value>
+  </data>
+  <data name="CheatEditor_Title" xml:space="preserve">
+    <value>Cheats bearbeiten — {0}</value>
+  </data>
+  <data name="CheatEditor_EnableCheat" xml:space="preserve">
+    <value>Diesen Cheat aktivieren</value>
+  </data>
+  <data name="CheatEditor_AddCustom" xml:space="preserve">
+    <value>Benutzerdefinierten Cheat hinzufügen</value>
+  </data>
+  <data name="CheatEditor_Delete" xml:space="preserve">
+    <value>Cheat löschen</value>
+  </data>
+  <data name="CheatEditor_SaveSuccess" xml:space="preserve">
+    <value>CHEAT.TXT erfolgreich aktualisiert.</value>
+  </data>
+  <data name="CheatEditor_EnterCode" xml:space="preserve">
+    <value>Cheat-Code eingeben (z.B. VMODE=NTSC):</value>
+  </data>
+  <data name="CheatEditor_NewCustom" xml:space="preserve">
+    <value>Neuer benutzerdefinierter Cheat</value>
+  </data>
+  <data name="CheatEditor_CustomDescription" xml:space="preserve">
+    <value>Benutzerdefinierter Cheat</value>
+  </data>
+  <data name="CheatEditor_CustomCategory" xml:space="preserve">
+    <value>Benutzerdefiniert</value>
+  </data>
+
+  <!-- Game Selector -->
+  <data name="GameSelector_Title" xml:space="preserve">
+    <value>Spiel auswählen</value>
+  </data>
+  <data name="GameSelector_SelectGame" xml:space="preserve">
+    <value>Verarbeitetes Spiel auswählen</value>
+  </data>
+  <data name="GameSelector_EditCheats" xml:space="preserve">
+    <value>Cheats bearbeiten</value>
+  </data>
+
+  <!-- Generische Buttons -->
+  <data name="Button_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Button_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+</root>
