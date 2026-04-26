@@ -1,8 +1,8 @@
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
-
 using POPSManager.Android.Services;
 using POPSManager.Core.Services;
+using POPSManager.Core.Localization;
 using POPSManager.Android.Views;
 using POPSManager.Android.ViewModels;
 
@@ -22,18 +22,24 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        // Servicios del Core (ahora con registros reales)
+        // --- Servicios del Core ---
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
-        builder.Services.AddSingleton<INotificationService, NotificationService>();
-        builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>(); // Android da la implementación real
+        // NotificationService requiere un Action<string, NotificationType>; lo conectaremos en App.xaml.cs
+        builder.Services.AddSingleton<NotificationService>();
+        builder.Services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
+        builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
         builder.Services.AddSingleton<ProgressService>();
         builder.Services.AddSingleton<ConverterService>();
         builder.Services.AddSingleton<GameProcessor>();
 
-        // ViewModels
+        // --- NUEVOS: Settings y Localización ---
+        builder.Services.AddSingleton<SettingsService>();
+        builder.Services.AddSingleton<LocalizationService>();
+
+        // --- ViewModels ---
         builder.Services.AddSingleton<HomeViewModel>();
 
-        // Vistas
+        // --- Vistas ---
         builder.Services.AddSingleton<HomePage>();
 
         return builder.Build();
