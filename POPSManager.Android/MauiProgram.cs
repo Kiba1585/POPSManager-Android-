@@ -1,3 +1,4 @@
+using CommunityToolkit.Maui;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using POPSManager.Android.Services;
@@ -16,6 +17,7 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
+            .UseMauiCommunityToolkit()            // ← Necesario para FolderPicker
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -24,7 +26,6 @@ public static class MauiProgram
 
         // --- Servicios del Core ---
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
-        // NotificationService requiere un Action<string, NotificationType>; lo conectaremos en App.xaml.cs
         builder.Services.AddSingleton<NotificationService>();
         builder.Services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
         builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
@@ -32,15 +33,22 @@ public static class MauiProgram
         builder.Services.AddSingleton<ConverterService>();
         builder.Services.AddSingleton<GameProcessor>();
 
-        // --- NUEVOS: Settings y Localización ---
+        // --- Settings y Localización ---
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<LocalizationService>();
 
         // --- ViewModels ---
         builder.Services.AddSingleton<HomeViewModel>();
+        builder.Services.AddSingleton<ConvertViewModel>();
+        builder.Services.AddSingleton<ProcessPopsViewModel>();
 
         // --- Vistas ---
         builder.Services.AddSingleton<HomePage>();
+        builder.Services.AddSingleton<ConvertPage>();
+        builder.Services.AddSingleton<ProcessPopsPage>();
+
+        // --- Shell ---
+        builder.Services.AddSingleton<AppShell>();
 
         return builder.Build();
     }
