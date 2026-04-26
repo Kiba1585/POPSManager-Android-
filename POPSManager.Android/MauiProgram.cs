@@ -1,13 +1,8 @@
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 
-// Android services
 using POPSManager.Android.Services;
-
-// Core services
 using POPSManager.Core.Services;
-
-// Views & ViewModels
 using POPSManager.Android.Views;
 using POPSManager.Android.ViewModels;
 
@@ -27,19 +22,18 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        // Android-specific services
-        builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
-        builder.Services.AddSingleton<ILoggingService, LoggingServiceAndroid>();
-        builder.Services.AddSingleton<INotificationService, NotificationServiceAndroid>();
-
-        // Core services
-        builder.Services.AddSingleton<GameProcessor>();
+        // Servicios del Core (ahora con registros reales)
+        builder.Services.AddSingleton<ILoggingService, LoggingService>();
+        builder.Services.AddSingleton<INotificationService, NotificationService>();
+        builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>(); // Android da la implementación real
+        builder.Services.AddSingleton<ProgressService>();
         builder.Services.AddSingleton<ConverterService>();
+        builder.Services.AddSingleton<GameProcessor>();
 
         // ViewModels
         builder.Services.AddSingleton<HomeViewModel>();
 
-        // Views
+        // Vistas
         builder.Services.AddSingleton<HomePage>();
 
         return builder.Build();
