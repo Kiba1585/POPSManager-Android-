@@ -1,0 +1,11 @@
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:views="clr-namespace:POPSManager.Android.Views"
+       x:Class="POPSManager.Android.AppShell">
+
+    <TabBar>
+        <ShellContent Title="Inicio" ContentTemplate="{DataTemplate views:HomePage}" />
+        <ShellContent Title="Convertir" ContentTemplate="{DataTemplate views:ConvertPage}" />
+        <ShellContent Title="Procesar" ContentTemplate="{DataTemplate views:ProcessPopsPage}" />
+    </TabBar>
+</Shell>
