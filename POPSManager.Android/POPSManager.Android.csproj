@@ -7,9 +7,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <!-- Obligatorio en .NET 8 -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.100" />
+    <!-- NUEVO: Para FolderPicker y otras utilidades -->
+    <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
   </ItemGroup>
 
   <!-- Referencia al proyecto Core -->
@@ -17,9 +18,10 @@
     <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
   </ItemGroup>
 
-  <!-- Solo XAML, los .cs se incluyen automáticamente -->
+  <!-- XAML -->
   <ItemGroup>
     <MauiXaml Include="App.xaml" />
+    <MauiXaml Include="AppShell.xaml" />          <!-- NUEVO -->
     <MauiXaml Include="Views\**\*.xaml" />
   </ItemGroup>
 
