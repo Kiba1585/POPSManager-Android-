@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ウィンドウとタイトル -->
+  <data name="Title_ProgressWindow" xml:space="preserve">
+    <value>進行状況</value>
+  </data>
+  <data name="Title_CheatSettings" xml:space="preserve">
+    <value>チート設定</value>
+  </data>
+
+  <!-- 状態とアクション -->
+  <data name="Label_ProcessingGames" xml:space="preserve">
+    <value>ゲームを処理中…</value>
+  </data>
+  <data name="Label_Completed" xml:space="preserve">
+    <value>完了</value>
+  </data>
+  <data name="Label_Error" xml:space="preserve">
+    <value>エラー</value>
+  </data>
+
+  <!-- 進行状況メッセージ -->
+  <data name="Progress_Starting" xml:space="preserve">
+    <value>開始中…</value>
+  </data>
+  <data name="Progress_Preparing" xml:space="preserve">
+    <value>準備中…</value>
+  </data>
+  <data name="Progress_CopyingDisc" xml:space="preserve">
+    <value>ディスク {0} をコピー中…</value>
+  </data>
+  <data name="Progress_DownloadingCover" xml:space="preserve">
+    <value>カバーをダウンロード中…</value>
+  </data>
+  <data name="Progress_GeneratingELF" xml:space="preserve">
+    <value>ELF を生成中…</value>
+  </data>
+  <data name="Progress_GeneratingCheats" xml:space="preserve">
+    <value>チートを生成中…</value>
+  </data>
+  <data name="Progress_GeneratingDiscsTxt" xml:space="preserve">
+    <value>DISCS.TXT を生成中…</value>
+  </data>
+  <data name="Progress_CopyingISO" xml:space="preserve">
+    <value>ISO をコピー中…</value>
+  </data>
+
+  <!-- ダイアログ -->
+  <data name="Message_SettingsSaved" xml:space="preserve">
+    <value>設定が正常に保存されました。</value>
+  </data>
+
+  <!-- 通知 -->
+  <data name="Notification_Success" xml:space="preserve">
+    <value>成功</value>
+  </data>
+  <data name="Notification_Error" xml:space="preserve">
+    <value>エラー</value>
+  </data>
+  <data name="Notification_Warning" xml:space="preserve">
+    <value>警告</value>
+  </data>
+  <data name="Notification_Info" xml:space="preserve">
+    <value>情報</value>
+  </data>
+  <data name="Notification_Message" xml:space="preserve">
+    <value>メッセージ</value>
+  </data>
+
+  <!-- チート設定 -->
+  <data name="Cheat_ModeLabel" xml:space="preserve">
+    <value>生成モード</value>
+  </data>
+  <data name="Cheat_ModeDisabled" xml:space="preserve">
+    <value>無効</value>
+  </data>
+  <data name="Cheat_ModeAutoPal" xml:space="preserve">
+    <value>PALゲーム用に自動</value>
+  </data>
+  <data name="Cheat_ModeAsk" xml:space="preserve">
+    <value>毎回確認</value>
+  </data>
+  <data name="Cheat_ModeManual" xml:space="preserve">
+    <value>処理前に手動選択</value>
+  </data>
+  <data name="Cheat_AdvancedLabel" xml:space="preserve">
+    <value>詳細オプション</value>
+  </data>
+  <data name="Cheat_AutoFixes" xml:space="preserve">
+    <value>ゲームごとの自動修正を使用</value>
+  </data>
+  <data name="Cheat_EngineFixes" xml:space="preserve">
+    <value>エンジン修正を使用</value>
+  </data>
+  <data name="Cheat_HeuristicFixes" xml:space="preserve">
+    <value>ヒューリスティック修正を使用</value>
+  </data>
+  <data name="Cheat_DatabaseFixes" xml:space="preserve">
+    <value>GameDatabaseからの修正を使用</value>
+  </data>
+  <data name="Cheat_CustomCheats" xml:space="preserve">
+    <value>ユーザーカスタムチートを許可</value>
+  </data>
+
+  <!-- チートエディタ -->
+  <data name="CheatEditor_WindowTitle" xml:space="preserve">
+    <value>チートエディタ</value>
+  </data>
+  <data name="CheatEditor_Title" xml:space="preserve">
+    <value>チート編集 — {0}</value>
+  </data>
+  <data name="CheatEditor_EnableCheat" xml:space="preserve">
+    <value>このチートを有効にする</value>
+  </data>
+  <data name="CheatEditor_AddCustom" xml:space="preserve">
+    <value>カスタムチートを追加</value>
+  </data>
+  <data name="CheatEditor_Delete" xml:space="preserve">
+    <value>チートを削除</value>
+  </data>
+  <data name="CheatEditor_SaveSuccess" xml:space="preserve">
+    <value>CHEAT.TXT が正常に更新されました。</value>
+  </data>
+  <data name="CheatEditor_EnterCode" xml:space="preserve">
+    <value>チートコードを入力（例：VMODE=NTSC）:</value>
+  </data>
+  <data name="CheatEditor_NewCustom" xml:space="preserve">
+    <value>新しいカスタムチート</value>
+  </data>
+  <data name="CheatEditor_CustomDescription" xml:space="preserve">
+    <value>カスタムチート</value>
+  </data>
+  <data name="CheatEditor_CustomCategory" xml:space="preserve">
+    <value>カスタム</value>
+  </data>
+
+  <!-- ゲームセレクタ -->
+  <data name="GameSelector_Title" xml:space="preserve">
+    <value>ゲームを選択</value>
+  </data>
+  <data name="GameSelector_SelectGame" xml:space="preserve">
+    <value>処理済みゲームを選択</value>
+  </data>
+  <data name="GameSelector_EditCheats" xml:space="preserve">
+    <value>チートを編集</value>
+  </data>
+
+  <!-- 汎用ボタン -->
+  <data name="Button_Cancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="Button_Save" xml:space="preserve">
+    <value>保存</value>
+  </data>
+</root>
