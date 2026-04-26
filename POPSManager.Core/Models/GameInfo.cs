@@ -3,6 +3,6 @@ namespace POPSManager.Core.Models;
 public class GameInfo
 {
     public string Name { get; set; } = "";
-    public string Path { get; set; } = "";
-    public string Id { get; set; } = "";
+    public int DiscNumber { get; set; } = 1;
+    public string? CoverUrl { get; set; }
 }
