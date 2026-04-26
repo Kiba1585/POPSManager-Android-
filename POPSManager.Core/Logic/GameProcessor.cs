@@ -445,9 +445,91 @@ namespace POPSManager.Logic
                     continue;
                 }
 
-                bool ok = ElfGenerator.GeneratePs1Elf(
-                    _paths.PopstarterElfPath,
-                    vcdPath,
-                    _paths.AppsFolder,
-                    discNumber,
-  
+                
+                string confPath = Path.Combine(rootFolder, "conf_apps.cfg");
+                var lines = new List<string>();
+                foreach (var elf in elfFiles)
+                {
+                    string fileName = Path.GetFileName(elf);
+                    lines.Add($"mass:/APPS/{fileName}");
+                }
+
+                File.WriteAllLines(confPath, lines);
+                _log.Info($"[conf_apps.cfg] Generado con {lines.Count} aplicaciones -> {confPath}");
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"[conf_apps.cfg] Error generando archivo: {ex.Message}");
+            }
+        }
+
+        // ============================================================
+        //  NUEVO: Validar estructura OPL
+        // ============================================================
+        private void ValidateOplStructure(string rootFolder)
+        {
+            _log.Info("[OPL] Verificando estructura de carpetas…");
+            string[] requiredFolders = { "POPS", "APPS", "DVD", "CFG", "ART", "LNG", "THM", "VMC" };
+            var missing = new List<string>();
+
+            foreach (var folder in requiredFolders)
+            {
+                string fullPath = Path.Combine(rootFolder, folder);
+                if (!Directory.Exists(fullPath))
+                {
+                    missing.Add(folder);
+                    _log.Warn($"[OPL] Falta carpeta requerida: {folder}");
+                }
+            }
+
+            if (missing.Count == 0)
+            {
+                _log.Info("[OPL] Estructura de carpetas correcta.");
+            }
+            else
+            {
+                _log.Warn($"[OPL] Faltan {missing.Count} carpetas: {string.Join(", ", missing)}. Se recomienda ejecutar 'Procesar POPS' o crearlas manualmente.");
+            }
+        }
+
+        private void CopyCustomFolderContents(string sourceFolder, string folderName, Action<string> log)
+        {
+            if (string.IsNullOrWhiteSpace(sourceFolder) || !Directory.Exists(sourceFolder))
+            {
+                log(string.Format("[Copy] No se encontro carpeta {0} personalizada o no existe.", folderName));
+                return;
+            }
+            string destFolder = Path.Combine(_paths.RootFolder, folderName);
+            try
+            {
+                Directory.CreateDirectory(destFolder);
+                foreach (var file in Directory.GetFiles(sourceFolder))
+                {
+                    string destFile = Path.Combine(destFolder, Path.GetFileName(file));
+                    File.Copy(file, destFile, true);
+                    log(string.Format("[Copy] {0} -> {1}", file, destFile));
+                }
+                foreach (var dir in Directory.GetDirectories(sourceFolder))
+                {
+                    string destDir = Path.Combine(destFolder, Path.GetFileName(dir));
+                    CopyDirectoryRecursive(dir, destDir, log);
+                }
+                log(string.Format("[Copy] Contenido de {0} copiado a {1}", folderName, destFolder));
+            }
+            catch (Exception ex) { log(string.Format("[ERROR] Copiando {0}: {1}", folderName, ex.Message)); }
+        }
+
+        private void CopyDirectoryRecursive(string source, string dest, Action<string> log)
+        {
+            Directory.CreateDirectory(dest);
+            foreach (var file in Directory.GetFiles(source))
+            {
+                string destFile = Path.Combine(dest, Path.GetFileName(file));
+                File.Copy(file, destFile, true);
+                log(string.Format("[Copy] {0} -> {1}", file, destFile));
+            }
+            foreach (var dir in Directory.GetDirectories(source))
+                CopyDirectoryRecursive(dir, Path.Combine(dest, Path.GetFileName(dir)), log);
+        }
+    }
+}
