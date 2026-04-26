@@ -12,4 +12,9 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
   </ItemGroup>
 
+  <!-- NUEVO: Archivos de localización como recursos embebidos -->
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\*.resx" />
+  </ItemGroup>
+
 </Project>
