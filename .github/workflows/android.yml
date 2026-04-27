@@ -35,37 +35,15 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 📦 CONFIGURAR SDK DE ANDROID (PLATAFORMAS + LICENCIAS)
+    # 🤖 CONFIGURAR SDK DE ANDROID (ACCIÓN OFICIAL)
     # -----------------------------------------------------------
-    - name: Configurar Android SDK y aceptar licencias
-      run: |
-        # Buscar el SDK Manager instalado por el workload de MAUI
-        $sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { Join-Path $env:USERPROFILE "android\sdk" }
-        $sdkManager = Join-Path $sdkRoot "cmdline-tools\latest\bin\sdkmanager.bat"
-        
-        if (-not (Test-Path $sdkManager)) {
-          # Alternativa: puede estar en "C:\Program Files (x86)\Android\android-sdk"
-          $sdkRoot = "C:\Program Files (x86)\Android\android-sdk"
-          $sdkManager = Join-Path $sdkRoot "cmdline-tools\latest\bin\sdkmanager.bat"
-        }
-        
-        if (Test-Path $sdkManager) {
-          Write-Host "SDK Manager encontrado en $sdkManager"
-          
-          # Aceptar licencias
-          cmd /c "echo y| `"$sdkManager`" --licenses"
-          Write-Host "Licencias aceptadas."
-          
-          # Instalar plataformas necesarias para compilar (API 34 es la común para MAUI en .NET 8)
-          Write-Host "Instalando plataformas de Android (android-34)..."
-          cmd /c "`"$sdkManager`" `"platforms;android-34`""
-          Write-Host "Plataformas instaladas."
-        } else {
-          Write-Host "SDK Manager no encontrado. Intentando usando sdkmanager integrado en MSBuild..."
-          # Último recurso: usar el target de instalación de dependencias de MAUI
-          dotnet build POPSManager.Android/POPSManager.Android.csproj -t:InstallAndroidDependencies -f net8.0-android -p:AcceptAndroidSDKLicenses=true
-        }
-      shell: pwsh
+    - name: Configurar Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        sdk-version: 34
+        build-tools-version: 34.0.0
+        accept-license: true
+        packages: 'platforms;android-34 build-tools;34.0.0'
 
     # -----------------------------------------------------------
     # 🧹 LIMPIEZA TOTAL
