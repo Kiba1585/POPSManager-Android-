@@ -36,8 +36,8 @@ public class HomeViewModel : BindableObject
         ChangeSourceFolderCommand = new Command(async () => await ChangeSourceFolder());
         ChangeDestinationFolderCommand = new Command(async () => await ChangeDestinationFolder());
         ChangeElfFolderCommand = new Command(async () => await ChangeElfFolder());
-        OpenConvertCommand = new Command(async () => await OpenConvert());
-        OpenProcessPopsCommand = new Command(async () => await OpenProcessPops());
+        OpenConvertCommand = new Command(OpenConvert);
+        OpenProcessPopsCommand = new Command(OpenProcessPops);
         OpenRootFolderCommand = new Command(OpenRootFolder);
         OpenElfFolderCommand = new Command(OpenElfFolder);
 
@@ -100,8 +100,8 @@ public class HomeViewModel : BindableObject
         }
     }
 
-    private async Task OpenConvert() { }
-    private async Task OpenProcessPops() { }
+    private void OpenConvert() { }
+    private void OpenProcessPops() { }
     private void OpenRootFolder() { }
     private void OpenElfFolder() { }
 }
