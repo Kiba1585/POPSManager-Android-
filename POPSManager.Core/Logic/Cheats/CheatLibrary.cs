@@ -1,3 +1,4 @@
+using POPSManager.Core.Logic.Cheats;
 using System.Collections.Generic;
 
 namespace POPSManager.Logic.Cheats
