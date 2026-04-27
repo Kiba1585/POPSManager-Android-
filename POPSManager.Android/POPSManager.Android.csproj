@@ -16,11 +16,4 @@
     <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
   </ItemGroup>
 
-  <!-- XAML: solo las vistas (App.xaml y AppShell.xaml los incluye automáticamente el SDK) -->
-  <ItemGroup>
-    <MauiXaml Include="Views\HomePage.xaml" />
-    <MauiXaml Include="Views\ConvertPage.xaml" />
-    <MauiXaml Include="Views\ProcessPopsPage.xaml" />
-  </ItemGroup>
-
 </Project>
