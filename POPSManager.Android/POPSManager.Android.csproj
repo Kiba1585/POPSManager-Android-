@@ -12,14 +12,15 @@
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
   </ItemGroup>
 
-  <!-- Referencia al proyecto Core -->
   <ItemGroup>
     <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
   </ItemGroup>
 
-  <!-- XAML: solo los que están en subcarpetas (el SDK ya incluye App.xaml y AppShell.xaml automáticamente) -->
+  <!-- XAML: solo las vistas (App.xaml y AppShell.xaml los incluye automáticamente el SDK) -->
   <ItemGroup>
-    <MauiXaml Include="Views\**\*.xaml" />
+    <MauiXaml Include="Views\HomePage.xaml" />
+    <MauiXaml Include="Views\ConvertPage.xaml" />
+    <MauiXaml Include="Views\ProcessPopsPage.xaml" />
   </ItemGroup>
 
 </Project>
