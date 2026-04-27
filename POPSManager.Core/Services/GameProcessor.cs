@@ -66,6 +66,8 @@ namespace POPSManager.Core.Services
                 string category = file.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) ? "PS2" : "PS1";
                 await ProcessSingleGameAsync(file, category);
             }
+            
+            await Task.CompletedTask; // Elimina CS1998
         }
 
         public async Task ProcessSingleGameAsync(string filePath, string category)
@@ -88,12 +90,33 @@ namespace POPSManager.Core.Services
                 File.Copy(filePath, dest, true);
                 _notify.Success($"Juego de PS1 copiado.");
             }
+            
+            await Task.CompletedTask; // Elimina CS1998
         }
 
-        public async Task DownloadCoverAsync(string gameId, string category) { /* Placeholder */ }
-        public async Task GenerateElfAsync(string gamePath, string gameId, string category) { /* Placeholder */ }
-        public async Task GenerateMetadataAsync(string gameId, string gamePath, string category) { /* Placeholder */ }
-        public async Task GenerateCheatsAsync(string gameId, string gamePath, string category) { /* Placeholder */ }
+        public async Task DownloadCoverAsync(string gameId, string category)
+        {
+            // Placeholder - implementación futura
+            await Task.CompletedTask;
+        }
+
+        public async Task GenerateElfAsync(string gamePath, string gameId, string category)
+        {
+            // Placeholder - implementación futura
+            await Task.CompletedTask;
+        }
+
+        public async Task GenerateMetadataAsync(string gameId, string gamePath, string category)
+        {
+            // Placeholder - implementación futura
+            await Task.CompletedTask;
+        }
+
+        public async Task GenerateCheatsAsync(string gameId, string gamePath, string category)
+        {
+            // Placeholder - implementación futura
+            await Task.CompletedTask;
+        }
 
         private Dictionary<string, List<string>> GroupByRealGame(string[] files) => files
             .GroupBy(f => Path.GetFileNameWithoutExtension(f), StringComparer.OrdinalIgnoreCase)
