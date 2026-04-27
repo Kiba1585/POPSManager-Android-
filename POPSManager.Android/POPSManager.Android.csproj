@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.100" />
-    <!-- NUEVO: Para FolderPicker y otras utilidades -->
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
   </ItemGroup>
 
@@ -18,10 +17,8 @@
     <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
   </ItemGroup>
 
-  <!-- XAML -->
+  <!-- XAML: solo los que están en subcarpetas (el SDK ya incluye App.xaml y AppShell.xaml automáticamente) -->
   <ItemGroup>
-    <MauiXaml Include="App.xaml" />
-    <MauiXaml Include="AppShell.xaml" />          <!-- NUEVO -->
     <MauiXaml Include="Views\**\*.xaml" />
   </ItemGroup>
 
