@@ -1,3 +1,5 @@
+using POPSManager.Core.Services;
+
 namespace POPSManager.Android;
 
 public partial class App : Application
