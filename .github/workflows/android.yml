@@ -100,10 +100,22 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 📦 SUBIR APK FIRMADO
+    # 📦 SUBIR APK FIRMADO COMO ARTEFACTO
     # -----------------------------------------------------------
     - name: Subir artefacto APK
       uses: actions/upload-artifact@v4
       with:
         name: POPSManager-Android-Signed
         path: publish/*.apk
+
+    # -----------------------------------------------------------
+    # 🚀 CREAR RELEASE AUTOMÁTICO CON EL APK
+    # -----------------------------------------------------------
+    - name: Crear Release y subir APK
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ github.run_number }}
+        name: "Android Build v${{ github.run_number }}"
+        files: publish/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
