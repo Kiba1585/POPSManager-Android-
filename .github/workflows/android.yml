@@ -35,12 +35,6 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🔑 ACEPTAR LICENCIAS DEL SDK DE ANDROID (CORREGIDO)
-    # -----------------------------------------------------------
-    - name: Aceptar licencias del SDK de Android
-      run: dotnet build POPSManager.Android/POPSManager.Android.csproj -t:AcceptAndroidSDKLicenses -p:AcceptAndroidSDKLicenses=true -f net8.0-android
-
-    # -----------------------------------------------------------
     # 🧹 LIMPIEZA TOTAL
     # -----------------------------------------------------------
     - name: Limpiar caché NuGet
@@ -91,7 +85,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 GENERAR APK FIRMADO (PUBLISH con RID y formato APK)
+    # 🔨 GENERAR APK FIRMADO (PUBLISH CON LICENCIAS ACEPTADAS)
     # -----------------------------------------------------------
     - name: Generar APK firmado (publish)
       run: |
@@ -110,9 +104,10 @@ jobs:
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        DOTNET_RUN_ACCEPT_ANDROID_SDK_LICENSES: 1   # 👈 clave
 
     # -----------------------------------------------------------
-    # 🔍 DIAGNÓSTICO (opcional pero útil)
+    # 🔍 DIAGNÓSTICO (OPCIONAL)
     # -----------------------------------------------------------
     - name: Listar archivos generados
       run: |
