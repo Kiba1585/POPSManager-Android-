@@ -1,5 +1,8 @@
 name: Build Android (MAUI)
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ "main" ]
@@ -64,7 +67,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 📦 RESTAURAR PROYECTOS (desde cero)
+    # 📦 RESTAURAR PROYECTOS
     # -----------------------------------------------------------
     - name: Restaurar solución
       run: dotnet restore POPSManager.sln
@@ -100,13 +103,15 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 📦 SUBIR APK FIRMADO COMO ARTEFACTO
+    # 📦 SUBIR APK FIRMADO (ARTEFACTO)
     # -----------------------------------------------------------
     - name: Subir artefacto APK
       uses: actions/upload-artifact@v4
       with:
         name: POPSManager-Android-Signed
-        path: publish/*.apk
+        path: |
+          publish/**/*.apk
+          publish/**/*.aab
 
     # -----------------------------------------------------------
     # 🚀 CREAR RELEASE AUTOMÁTICO CON EL APK
@@ -116,6 +121,8 @@ jobs:
       with:
         tag_name: v${{ github.run_number }}
         name: "Android Build v${{ github.run_number }}"
-        files: publish/*.apk
+        files: |
+          publish/**/*.apk
+          publish/**/*.aab
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
