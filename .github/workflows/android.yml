@@ -35,7 +35,7 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 📦 CONFIGURAR SDK DE ANDROID (LICENCIAS AUTOMÁTICAS)
+    # 📦 CONFIGURAR SDK DE ANDROID (LICENCIAS CON START-PROCESS)
     # -----------------------------------------------------------
     - name: Configurar Android SDK
       run: |
@@ -50,7 +50,6 @@ jobs:
             }
         }
 
-        # Crear directorio real raíz
         New-Item -ItemType Directory -Force -Path $sdkRoot | Out-Null
 
         # Descargar command-line tools
@@ -81,18 +80,19 @@ jobs:
 
         $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
 
-        # Crear archivo de entrada con muchas 'y' para aceptar todas las licencias
-        $yesFile = "$env:TEMP\yes.txt"
-        Set-Content -Path $yesFile -Value ("y`n" * 20)   # 20 líneas 'y' son más que suficientes
+        # Archivo de respuestas (muchas 'y' para todas las licencias)
+        $yesFile = Join-Path $env:RUNNER_TEMP "yes.txt"
+        Set-Content -Path $yesFile -Value ("y`n" * 20)
 
-        Write-Host "Aceptando licencias (no interactivo)..."
-        Get-Content $yesFile | cmd /c "`"$sdkManager`" --licenses"
+        Write-Host "Aceptando licencias (no interactivo) mediante Start-Process..."
+        Start-Process -FilePath $sdkManager -ArgumentList "--licenses" -RedirectStandardInput $yesFile -Wait -NoNewWindow
+        Write-Host "Licencias aceptadas."
 
         # Instalar plataformas y herramientas necesarias
         Write-Host "Instalando plataformas Android..."
         cmd /c "`"$sdkManager`" `"platforms;android-34`" `"build-tools;34.0.0`""
 
-        # Variables de entorno
+        # Variables de entorno para los siguientes pasos
         "ANDROID_HOME=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
         "ANDROID_SDK_ROOT=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
 
