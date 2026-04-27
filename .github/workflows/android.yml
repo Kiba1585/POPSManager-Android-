@@ -32,10 +32,18 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR
+    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR (INCLUYE CACHÉ LOCAL)
     # -----------------------------------------------------------
     - name: Limpiar caché NuGet
       run: dotnet nuget locals all --clear
+
+    - name: Eliminar carpetas bin/obj locales
+      run: |
+        Remove-Item -Recurse -Force POPSManager.Android\bin -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force POPSManager.Android\obj -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force POPSManager.Core\bin -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force POPSManager.Core\obj -ErrorAction SilentlyContinue
+      shell: pwsh
 
     - name: Limpiar compilaciones anteriores
       run: dotnet clean POPSManager.sln --configuration Release
