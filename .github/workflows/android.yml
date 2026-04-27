@@ -35,15 +35,10 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🤖 CONFIGURAR SDK DE ANDROID (ACCIÓN OFICIAL)
+    # 📦 INSTALAR DEPENDENCIAS DE ANDROID Y ACEPTAR LICENCIAS
     # -----------------------------------------------------------
-    - name: Configurar Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        sdk-version: 34
-        build-tools-version: 34.0.0
-        accept-license: true
-        packages: 'platforms;android-34 build-tools;34.0.0'
+    - name: Instalar Android SDK y aceptar licencias
+      run: dotnet build POPSManager.Android/POPSManager.Android.csproj -t:InstallAndroidDependencies -f net8.0-android -p:AcceptAndroidSDKLicenses=true
 
     # -----------------------------------------------------------
     # 🧹 LIMPIEZA TOTAL
@@ -117,7 +112,7 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 🔍 DIAGNÓSTICO (OPCIONAL)
+    # 🔍 DIAGNÓSTICO (OPCIONAL PERO ÚTIL)
     # -----------------------------------------------------------
     - name: Listar archivos generados
       run: |
