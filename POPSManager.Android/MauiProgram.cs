@@ -4,6 +4,9 @@ using Microsoft.Maui.Hosting;
 using POPSManager.Android.Services;
 using POPSManager.Core.Services;
 using POPSManager.Core.Localization;
+using POPSManager.Core.Logic.Automation;
+using POPSManager.Core.Settings;
+using POPSManager.Core.Logic.Cheats;
 using POPSManager.Android.Views;
 using POPSManager.Android.ViewModels;
 
@@ -17,7 +20,7 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
-            .UseMauiCommunityToolkit()            // ← Necesario para FolderPicker
+            .UseMauiCommunityToolkit()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -29,13 +32,26 @@ public static class MauiProgram
         builder.Services.AddSingleton<NotificationService>();
         builder.Services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
         builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
-        builder.Services.AddSingleton<ProgressService>();
         builder.Services.AddSingleton<ConverterService>();
-        builder.Services.AddSingleton<GameProcessor>();
 
         // --- Settings y Localización ---
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<LocalizationService>();
+
+        // --- GameProcessor con todas sus dependencias ---
+        builder.Services.AddSingleton(sp =>
+        {
+            var log = sp.GetRequiredService<LoggingService>();
+            var notify = sp.GetRequiredService<NotificationService>();
+            var paths = sp.GetRequiredService<IPathsService>() as PathsService ?? new PathsService();
+            var settings = sp.GetRequiredService<SettingsService>();
+            var loc = sp.GetRequiredService<LocalizationService>();
+            var auto = new AutomationEngine(settings, notify, log);
+            var cheatSvc = new CheatSettingsService(paths.RootFolder, log.Info);
+            var cheatMgr = new CheatManagerService(cheatSvc, log.Info);
+
+            return new GameProcessor(log, notify, paths, cheatSvc, cheatMgr, settings, auto, loc);
+        });
 
         // --- ViewModels ---
         builder.Services.AddSingleton<HomeViewModel>();
