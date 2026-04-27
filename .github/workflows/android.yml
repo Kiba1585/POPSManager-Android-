@@ -1,7 +1,7 @@
 name: Build Android (MAUI)
 
 permissions:
-  contents: write          # Necesario para crear releases
+  contents: write
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR
+    # 🧹 LIMPIEZA TOTAL
     # -----------------------------------------------------------
     - name: Limpiar caché NuGet
       run: dotnet nuget locals all --clear
@@ -52,7 +52,7 @@ jobs:
       run: dotnet clean POPSManager.sln --configuration Release
 
     # -----------------------------------------------------------
-    # 🔍 ELIMINAR CUALQUIER DEFINICIÓN DUPLICADA DE LogEntry Y HomeViewModel
+    # 🔍 ELIMINAR DUPLICADOS DE VIEWMODELS
     # -----------------------------------------------------------
     - name: Eliminar archivos duplicados de LogEntry y HomeViewModel
       run: |
@@ -67,7 +67,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 📦 RESTAURAR PROYECTOS (desde cero)
+    # 📦 RESTAURAR
     # -----------------------------------------------------------
     - name: Restaurar solución
       run: dotnet restore POPSManager.sln
@@ -84,54 +84,55 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 COMPILAR Y FIRMAR APK (SALIDA A ./publish)
+    # 🔨 COMPILAR (genera el APK)
     # -----------------------------------------------------------
     - name: Compilar APK Firmado
       run: |
-        dotnet publish POPSManager.Android/POPSManager.Android.csproj `
+        dotnet build POPSManager.Android/POPSManager.Android.csproj `
           -c Release `
           -f net8.0-android `
           /p:AndroidKeyStore=true `
           /p:AndroidSigningKeyStore=popsmanager.keystore `
           /p:AndroidSigningKeyAlias=$env:KEY_ALIAS `
           /p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
-          /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD `
-          --output ./publish
+          /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD
       env:
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 🔎 DIAGNÓSTICO: VER QUÉ ARCHIVOS SE PUBLICARON REALMENTE
+    # 📁 COPIAR APK A LA CARPETA publish
     # -----------------------------------------------------------
-    - name: 🔎 Diagnosticar salida de publish
+    - name: Copiar APK generado
       run: |
-        Write-Host "Contenido de publish:"
-        Get-ChildItem -Recurse publish | Select-Object FullName
+        New-Item -ItemType Directory -Force -Path publish
+        $apk = Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android" -Filter "*.apk" -Recurse | Select-Object -First 1
+        if ($apk) {
+          Copy-Item $apk.FullName publish\
+          Write-Host "APK copiado: $($apk.FullName)"
+        } else {
+          Write-Host "No se encontró ningún APK en la carpeta de salida."
+        }
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 📦 SUBIR APK FIRMADO COMO ARTEFACTO
+    # 📦 SUBIR APK COMO ARTEFACTO
     # -----------------------------------------------------------
     - name: Subir artefacto APK
       uses: actions/upload-artifact@v4
       with:
         name: POPSManager-Android-Signed
-        path: |
-          publish/**/*.apk
-          publish/**/*.aab
+        path: publish/**/*.apk
 
     # -----------------------------------------------------------
-    # 🚀 CREAR RELEASE AUTOMÁTICO CON EL APK
+    # 🚀 CREAR RELEASE
     # -----------------------------------------------------------
     - name: Crear Release y subir APK
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ github.run_number }}
         name: "Android Build v${{ github.run_number }}"
-        files: |
-          publish/**/*.apk
-          publish/**/*.aab
+        files: publish/**/*.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
