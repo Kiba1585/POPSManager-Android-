@@ -35,31 +35,48 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 📦⬇️ INSTALAR SDK DE ANDROID COMPLETO (cmdline-tools + plataforma 34)
+    # 📦⬇️ CONFIGURAR SDK DE ANDROID COMPLETO
     # -----------------------------------------------------------
     - name: Configurar Android SDK y aceptar licencias
       run: |
         $sdkRoot = "C:\Android\android-sdk"
+        
+        # Eliminar enlace simbólico roto si existe
+        if (Test-Path $sdkRoot -PathType Container) {
+            $item = Get-Item $sdkRoot -Force
+            if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                Write-Host "Eliminando enlace simbólico roto en $sdkRoot"
+                Remove-Item -LiteralPath $sdkRoot -Force -Recurse -ErrorAction SilentlyContinue
+            }
+        }
+        
+        # Crear directorio real
         New-Item -ItemType Directory -Force -Path $sdkRoot
         
-        # Descargar command-line tools de Google
-        $zipUrl = "https://dl.google.com/android/repository/commandlinetools-win-12266719_latest.zip"
+        # Descargar command-line tools (versión actualizada)
+        $zipUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
         $zipPath = "$env:TEMP\cmdline-tools.zip"
         $extractPath = "$env:TEMP\cmdline-tools-extract"
         
-        Write-Host "Descargando Android SDK command-line tools..."
+        Write-Host "Descargando Android SDK command-line tools desde $zipUrl..."
         Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
         
+        Write-Host "Extrayendo..."
         Expand-Archive -Path $zipPath -DestinationPath $extractPath
         
-        # Mover a la ubicación esperada por MAUI (cmdline-tools\latest)
+        # Mover a la ubicación esperada por MAUI: cmdline-tools\latest
         $latestDir = Join-Path $sdkRoot "cmdline-tools\latest"
         if (Test-Path $latestDir) { Remove-Item -Recurse -Force $latestDir }
         Move-Item -Path (Join-Path $extractPath "cmdline-tools\*") -Destination $latestDir
         
         $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
         
-        # Aceptar todas las licencias de forma automática
+        if (-not (Test-Path $sdkManager)) {
+            Write-Host "No se encontró sdkmanager.bat. Abortando."
+            exit 1
+        }
+        
+        # Aceptar todas las licencias (enviamos muchos 'y' por si hay varias)
         Write-Host "Aceptando licencias..."
         cmd /c "(echo y & echo y & echo y & echo y & echo y & echo y & echo y & echo y) | `"$sdkManager`" --licenses"
         
@@ -70,6 +87,8 @@ jobs:
         # Establecer variables de entorno para pasos siguientes
         Write-Host "ANDROID_HOME=$sdkRoot" >> $env:GITHUB_ENV
         Write-Host "ANDROID_SDK_ROOT=$sdkRoot" >> $env:GITHUB_ENV
+        
+        Write-Host "Configuración de SDK de Android completada."
       shell: pwsh
 
     # -----------------------------------------------------------
