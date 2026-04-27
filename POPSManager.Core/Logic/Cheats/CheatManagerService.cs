@@ -3,14 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using POPSManager.Logic; // Para CheatGenerator
-using POPSManager.Settings;
+using POPSManager.Core.Logic;
+using POPSManager.Core.Settings;
 
-namespace POPSManager.Logic.Cheats
+namespace POPSManager.Core.Logic.Cheats
 {
-    /// <summary>
-    /// Servicio para gestionar la carga, guardado y fusión de cheats.
-    /// </summary>
     public class CheatManagerService
     {
         private readonly CheatSettingsService _settings;
@@ -22,21 +19,16 @@ namespace POPSManager.Logic.Cheats
             _log = log;
         }
 
-        // ============================================================
-        //  LEER CHEAT.TXT EXISTENTE
-        // ============================================================
         public List<string> LoadCheatFile(string cheatPath)
         {
-            if (!File.Exists(cheatPath))
-                return new List<string>();
-
+            if (!File.Exists(cheatPath)) return new List<string>();
             try
             {
                 return File.ReadAllLines(cheatPath)
-                           .Select(l => l.Trim())
-                           .Where(l => !string.IsNullOrWhiteSpace(l))
-                           .Distinct(StringComparer.OrdinalIgnoreCase)
-                           .ToList();
+                    .Select(l => l.Trim())
+                    .Where(l => !string.IsNullOrWhiteSpace(l))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
             }
             catch (Exception ex)
             {
@@ -45,9 +37,6 @@ namespace POPSManager.Logic.Cheats
             }
         }
 
-        // ============================================================
-        //  GUARDAR CHEAT.TXT
-        // ============================================================
         public void SaveCheatFile(string cheatPath, IEnumerable<string> cheats)
         {
             try
@@ -61,52 +50,25 @@ namespace POPSManager.Logic.Cheats
             }
         }
 
-        // ============================================================
-        //  FUSIONAR CHEATS (OFICIALES + AUTOMÁTICOS + PERSONALIZADOS)
-        // ============================================================
-        public List<string> MergeCheats(
-            IEnumerable<string> existing,
-            IEnumerable<string> autoFixes,
-            IEnumerable<string> userSelected)
+        public List<string> MergeCheats(IEnumerable<string> existing, IEnumerable<string> autoFixes, IEnumerable<string> userSelected)
         {
             var merged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var c in existing)
-                merged.Add(c);
-
+            foreach (var c in existing) merged.Add(c);
             if (_settings.Current.UseAutoGameFixes)
-                foreach (var c in autoFixes)
-                    merged.Add(c);
-
-            foreach (var c in userSelected)
-                merged.Add(c);
-
+                foreach (var c in autoFixes) merged.Add(c);
+            foreach (var c in userSelected) merged.Add(c);
             return merged.ToList();
         }
 
-        // ============================================================
-        //  GENERAR CHEATS AUTOMÁTICOS (USANDO CheatGenerator)
-        // ============================================================
         public List<string> GenerateAutoFixes(string gameId, string cd1Folder)
         {
-            // CheatGenerator escribe directamente en CHEAT.TXT dentro de cd1Folder
             CheatGenerator.GenerateCheatTxt(gameId, cd1Folder, msg => _log?.Invoke(msg));
-
             string cheatPath = Path.Combine(cd1Folder, "CHEAT.TXT");
-
-            if (!File.Exists(cheatPath))
-                return new List<string>();
-
+            if (!File.Exists(cheatPath)) return new List<string>();
             try
             {
-                var auto = File.ReadAllLines(cheatPath)
-                               .Select(l => l.Trim())
-                               .Where(l => !string.IsNullOrWhiteSpace(l))
-                               .ToList();
-
-                // Eliminar el archivo temporal generado automáticamente
+                var auto = File.ReadAllLines(cheatPath).Select(l => l.Trim()).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
                 File.Delete(cheatPath);
-
                 return auto;
             }
             catch (Exception ex)
@@ -116,47 +78,27 @@ namespace POPSManager.Logic.Cheats
             }
         }
 
-        // ============================================================
-        //  GUARDAR CHEATS PERSONALIZADOS DEL USUARIO
-        // ============================================================
         public void SaveUserCheats(string rootFolder, IEnumerable<CheatDefinition> customCheats)
         {
             try
             {
                 string folder = Path.Combine(rootFolder, "Cheats");
                 Directory.CreateDirectory(folder);
-
                 string path = Path.Combine(folder, "UserCheats.json");
-
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                string json = JsonSerializer.Serialize(customCheats, options);
-
+                var json = JsonSerializer.Serialize(customCheats, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(path, json);
-
                 _log?.Invoke("[Cheats] Cheats personalizados guardados.");
             }
-            catch (Exception ex)
-            {
-                _log?.Invoke($"[Cheats] Error guardando cheats personalizados: {ex.Message}");
-            }
+            catch (Exception ex) { _log?.Invoke($"[Cheats] Error guardando cheats personalizados: {ex.Message}"); }
         }
 
-        // ============================================================
-        //  CARGAR CHEATS PERSONALIZADOS DEL USUARIO
-        // ============================================================
         public List<CheatDefinition> LoadUserCheats(string rootFolder)
         {
             try
             {
                 string path = Path.Combine(rootFolder, "Cheats", "UserCheats.json");
-
-                if (!File.Exists(path))
-                    return new List<CheatDefinition>();
-
-                string json = File.ReadAllText(path);
-
-                return JsonSerializer.Deserialize<List<CheatDefinition>>(json)
-                       ?? new List<CheatDefinition>();
+                if (!File.Exists(path)) return new List<CheatDefinition>();
+                return JsonSerializer.Deserialize<List<CheatDefinition>>(File.ReadAllText(path)) ?? new List<CheatDefinition>();
             }
             catch (Exception ex)
             {
