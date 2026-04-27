@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
 using System.Windows.Input;
 using POPSManager.Core.Services;
 
@@ -10,7 +12,7 @@ public class FileItem
     public string Icon { get; set; } = "";
 }
 
-public class ConvertViewModel : ObservableObject
+public class ConvertViewModel : BindableObject
 {
     private readonly IPathsService _paths;
     private readonly ConverterService _converter;
@@ -26,9 +28,21 @@ public class ConvertViewModel : ObservableObject
     public ICommand SelectDestCommand { get; }
     public ICommand ConvertCommand { get; }
 
-    public string SourceFolder { get => _sourceFolder; set { SetProperty(ref _sourceFolder, value); LoadFiles(); } }
-    public string DestFolder { get => _destFolder; set => SetProperty(ref _destFolder, value); }
-    public string Status { get => _status; set => SetProperty(ref _status, value); }
+    public string SourceFolder
+    {
+        get => _sourceFolder;
+        set { if (_sourceFolder != value) { _sourceFolder = value; OnPropertyChanged(); LoadFiles(); } }
+    }
+    public string DestFolder
+    {
+        get => _destFolder;
+        set { if (_destFolder != value) { _destFolder = value; OnPropertyChanged(); } }
+    }
+    public string Status
+    {
+        get => _status;
+        set { if (_status != value) { _status = value; OnPropertyChanged(); } }
+    }
 
     public ConvertViewModel(IPathsService paths, ConverterService converter, ILoggingService log)
     {
