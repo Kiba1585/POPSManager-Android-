@@ -14,20 +14,11 @@ jobs:
       uses: actions/checkout@v4
 
     # -----------------------------------------------------------
-    # 🔥 ELIMINAR .NET 10 PREINSTALADO (evita NETSDK1202 y NETSDK1147)
+    # 🔥 ELIMINAR .NET 10 PREINSTALADO (evita conflictos)
     # -----------------------------------------------------------
     - name: Eliminar .NET preinstalado
       run: Remove-Item -Recurse -Force "C:\Program Files\dotnet"
       shell: pwsh
-
-    # -----------------------------------------------------------
-    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR
-    # -----------------------------------------------------------
-    - name: Limpiar compilaciones anteriores
-      run: dotnet clean POPSManager.sln --configuration Release
-
-    - name: Limpiar caché NuGet
-      run: dotnet nuget locals all --clear
 
     # -----------------------------------------------------------
     # 🔧 CONFIGURAR .NET 8
@@ -39,6 +30,15 @@ jobs:
 
     - name: Instalar carga de trabajo MAUI
       run: dotnet workload install maui
+
+    # -----------------------------------------------------------
+    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR
+    # -----------------------------------------------------------
+    - name: Limpiar caché NuGet
+      run: dotnet nuget locals all --clear
+
+    - name: Limpiar compilaciones anteriores
+      run: dotnet clean POPSManager.sln --configuration Release
 
     # -----------------------------------------------------------
     # 📦 RESTAURAR PROYECTOS (desde cero)
