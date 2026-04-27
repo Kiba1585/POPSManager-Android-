@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using POPSManager.Core.Services;
-using POPSManager.Core.Services.Interfaces;  // <-- Añadido
 
 namespace POPSManager.Android.ViewModels;
 
@@ -44,14 +43,6 @@ public class HomeViewModel : BindableObject
         OpenProcessPopsCommand = new Command(async () => await OpenProcessPops());
         OpenRootFolderCommand = new Command(OpenRootFolder);
         OpenElfFolderCommand = new Command(OpenElfFolder);
-
-        _log.OnLog += msg =>
-        {
-            MainThread.BeginInvokeOnMainThread(() =>
-            {
-                LogEntries.Insert(0, new LogEntry { Message = msg, Icon = "🔍", Color = "#CCCCCC" });
-            });
-        };
 
         LoadData();
     }
