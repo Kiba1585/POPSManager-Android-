@@ -35,25 +35,39 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🔑 ACEPTAR LICENCIAS DEL SDK DE ANDROID (CORREGIDO)
+    # 🔑 CONFIGURAR SDK DE ANDROID Y ACEPTAR LICENCIAS
     # -----------------------------------------------------------
-    - name: Aceptar licencias de Android SDK
+    - name: Instalar y configurar SDK de Android
       run: |
-        # Buscar la ruta del SDK de Android (instalado por el workload de MAUI)
-        $androidSdkPath = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { Join-Path $env:USERPROFILE "android\sdk" }
-        $sdkManager = Join-Path $androidSdkPath "cmdline-tools\latest\bin\sdkmanager.bat"
+        $androidSdkRoot = Join-Path $env:USERPROFILE "android\sdk"
+        Write-Host "##[add-path]$androidSdkRoot\cmdline-tools\latest\bin"
+        echo "ANDROID_HOME=$androidSdkRoot" >> $env:GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$androidSdkRoot" >> $env:GITHUB_ENV
         
-        if (Test-Path $sdkManager) {
-          Write-Host "Aceptando licencias del SDK de Android..."
-          # Ejecutar sdkmanager con cmd /c para evitar problemas de sintaxis de redirección
-          cmd /c "`"$sdkManager`" --licenses --verbose < nul"
-          Write-Host "Licencias aceptadas."
-        } else {
-          Write-Host "No se encontró sdkmanager en $sdkManager. Verifica la instalación del workload de MAUI."
-          # Opcional: intentar instalar las herramientas de línea de comandos
-          Write-Host "Intentando instalar cmdline-tools..."
-          dotnet build -t:_InstallAndroidSDK -f net8.0-android POPSManager.Android/POPSManager.Android.csproj /p:AcceptAndroidSDKLicenses=true
+        if (-not (Test-Path $androidSdkRoot)) {
+            New-Item -ItemType Directory -Force -Path $androidSdkRoot
         }
+        
+        $commandLineToolsZip = "https://dl.google.com/android/repository/commandlinetools-win-7580821_latest.zip"
+        $zipPath = Join-Path $env:TEMP "cmdline-tools.zip"
+        $extractPath = Join-Path $env:TEMP "cmdline-tools-extract"
+        
+        Write-Host "Descargando Android SDK Command Line Tools..."
+        Invoke-WebRequest -Uri $commandLineToolsZip -OutFile $zipPath
+        
+        Expand-Archive -Path $zipPath -DestinationPath $extractPath
+        
+        $latestDir = Join-Path $androidSdkRoot "cmdline-tools\latest"
+        if (Test-Path $latestDir) {
+            Remove-Item -Recurse -Force $latestDir
+        }
+        Move-Item -Path (Join-Path $extractPath "cmdline-tools\*") -Destination $latestDir
+        
+        $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
+        
+        Write-Host "Aceptando licencias del SDK de Android..."
+        cmd /c "echo y| `"$sdkManager`" --licenses"
+        Write-Host "Licencias aceptadas correctamente."
       shell: pwsh
 
     # -----------------------------------------------------------
@@ -107,7 +121,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 GENERAR APK FIRMADO (PUBLISH con ruta absoluta de keystore)
+    # 🔨 GENERAR APK FIRMADO (PUBLISH con RID y formato APK)
     # -----------------------------------------------------------
     - name: Generar APK firmado (publish)
       run: |
@@ -128,7 +142,7 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 🔍 DIAGNÓSTICO: LISTAR ARCHIVOS GENERADOS
+    # 🔍 DIAGNÓSTICO: LISTAR ARCHIVOS GENERADOS (opcional)
     # -----------------------------------------------------------
     - name: Listar archivos generados (APK/AAB)
       run: |
