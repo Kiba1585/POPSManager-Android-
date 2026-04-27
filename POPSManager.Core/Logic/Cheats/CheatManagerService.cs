@@ -44,10 +44,7 @@ namespace POPSManager.Core.Logic.Cheats
                 File.WriteAllLines(cheatPath, cheats);
                 _log?.Invoke($"[Cheats] CHEAT.TXT guardado → {cheatPath}");
             }
-            catch (Exception ex)
-            {
-                _log?.Invoke($"[Cheats] Error guardando CHEAT.TXT: {ex.Message}");
-            }
+            catch (Exception ex) { _log?.Invoke($"[Cheats] Error guardando CHEAT.TXT: {ex.Message}"); }
         }
 
         public List<string> MergeCheats(IEnumerable<string> existing, IEnumerable<string> autoFixes, IEnumerable<string> userSelected)
