@@ -32,7 +32,7 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR (INCLUYE CACHÉ LOCAL)
+    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR
     # -----------------------------------------------------------
     - name: Limpiar caché NuGet
       run: dotnet nuget locals all --clear
@@ -47,6 +47,16 @@ jobs:
 
     - name: Limpiar compilaciones anteriores
       run: dotnet clean POPSManager.sln --configuration Release
+
+    # -----------------------------------------------------------
+    # 🔥 ELIMINAR ARCHIVOS DUPLICADOS DE HomeViewModel (último recurso)
+    # -----------------------------------------------------------
+    - name: Eliminar copias duplicadas de HomeViewModel
+      run: |
+        Get-ChildItem -Recurse -Filter "HomeViewModel.cs" -Path POPSManager.Android |
+        Select-Object -Skip 1 |
+        Remove-Item -Force
+      shell: pwsh
 
     # -----------------------------------------------------------
     # 📦 RESTAURAR PROYECTOS (desde cero)
