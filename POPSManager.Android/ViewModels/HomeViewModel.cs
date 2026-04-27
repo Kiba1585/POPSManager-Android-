@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using POPSManager.Core.Services;
-using POPSManager.Core.Services.Interfaces;  // <-- AÑADIDO
 
 namespace POPSManager.Android.ViewModels;
 
