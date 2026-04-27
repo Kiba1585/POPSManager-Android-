@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using POPSManager.Core.Services;
+using POPSManager.Core.Services.Interfaces;  // <-- Añadido
 
 namespace POPSManager.Android.ViewModels;
 
@@ -112,10 +113,7 @@ public class HomeViewModel : BindableObject
     }
 
     private async Task OpenConvert() { }
-
     private async Task OpenProcessPops() { }
-
     private void OpenRootFolder() { }
-
     private void OpenElfFolder() { }
 }
