@@ -35,39 +35,10 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🔑 INSTALAR SDK DE ANDROID Y ACEPTAR LICENCIAS (OBLIGATORIO)
+    # 🔑 ACEPTAR LICENCIAS DEL SDK DE ANDROID (CORREGIDO)
     # -----------------------------------------------------------
-    - name: Instalar y configurar SDK de Android
-      run: |
-        $androidSdkRoot = Join-Path $env:USERPROFILE "android\sdk"
-        echo "ANDROID_HOME=$androidSdkRoot" >> $env:GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$androidSdkRoot" >> $env:GITHUB_ENV
-        
-        if (-not (Test-Path $androidSdkRoot)) {
-            New-Item -ItemType Directory -Force -Path $androidSdkRoot
-        }
-        
-        $commandLineToolsZip = "https://dl.google.com/android/repository/commandlinetools-win-7580821_latest.zip"
-        $zipPath = Join-Path $env:TEMP "cmdline-tools.zip"
-        $extractPath = Join-Path $env:TEMP "cmdline-tools-extract"
-        
-        Write-Host "Descargando Android SDK Command Line Tools..."
-        Invoke-WebRequest -Uri $commandLineToolsZip -OutFile $zipPath
-        
-        Expand-Archive -Path $zipPath -DestinationPath $extractPath
-        
-        $latestDir = Join-Path $androidSdkRoot "cmdline-tools\latest"
-        if (Test-Path $latestDir) {
-            Remove-Item -Recurse -Force $latestDir
-        }
-        Move-Item -Path (Join-Path $extractPath "cmdline-tools\*") -Destination $latestDir
-        
-        $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
-        
-        Write-Host "Aceptando licencias del SDK de Android..."
-        cmd /c "echo y| `"$sdkManager`" --licenses"
-        Write-Host "Licencias aceptadas correctamente."
-      shell: pwsh
+    - name: Aceptar licencias del SDK de Android
+      run: dotnet build POPSManager.Android/POPSManager.Android.csproj -t:AcceptAndroidSDKLicenses -p:AcceptAndroidSDKLicenses=true -f net8.0-android
 
     # -----------------------------------------------------------
     # 🧹 LIMPIEZA TOTAL
@@ -87,7 +58,7 @@ jobs:
       run: dotnet clean POPSManager.sln --configuration Release
 
     # -----------------------------------------------------------
-    # 🔍 ELIMINAR DUPLICADOS DE VIEWMODELS (si aplica)
+    # 🔍 ELIMINAR DUPLICADOS DE VIEWMODELS
     # -----------------------------------------------------------
     - name: Eliminar archivos duplicados de LogEntry y HomeViewModel
       run: |
@@ -120,7 +91,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 GENERAR APK FIRMADO
+    # 🔨 GENERAR APK FIRMADO (PUBLISH con RID y formato APK)
     # -----------------------------------------------------------
     - name: Generar APK firmado (publish)
       run: |
