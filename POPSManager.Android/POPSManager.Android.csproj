@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0-android</TargetFrameworks>
+    <TargetFramework>net8.0-android</TargetFramework>   <!-- singular, no plural -->
     <UseMaui>true</UseMaui>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
