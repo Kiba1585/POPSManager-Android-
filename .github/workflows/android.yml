@@ -13,37 +13,46 @@ jobs:
     - name: Checkout del repositorio
       uses: actions/checkout@v4
 
-    # 🔥 Eliminar .NET 10 preinstalado (causa NETSDK1202)
-    - name: Eliminar .NET preinstalado
-      run: Remove-Item -Recurse -Force "C:\Program Files\dotnet"
-      shell: pwsh
+    # -----------------------------------------------------------
+    # 🧹 LIMPIEZA TOTAL ANTES DE COMPILAR
+    # -----------------------------------------------------------
+    - name: Limpiar compilaciones anteriores
+      run: dotnet clean POPSManager.sln --configuration Release
 
-    # ✔ Instalar .NET 8 limpio
+    - name: Limpiar caché NuGet
+      run: dotnet nuget locals all --clear
+
+    # -----------------------------------------------------------
+    # 🔧 CONFIGURAR .NET 8 (sin eliminar carpetas agresivamente)
+    # -----------------------------------------------------------
     - name: Instalar SDK de .NET 8
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
-    # ✔ Instalar MAUI workload
     - name: Instalar carga de trabajo MAUI
       run: dotnet workload install maui
 
-    # ✔ Restaurar proyectos
+    # -----------------------------------------------------------
+    # 📦 RESTAURAR PROYECTOS (desde cero)
+    # -----------------------------------------------------------
     - name: Restaurar solución
       run: dotnet restore POPSManager.sln
 
-    # 🔐 Decodificar keystore desde secreto Base64 (CORREGIDO)
+    # -----------------------------------------------------------
+    # 🔐 DECODIFICAR KEYSTORE
+    # -----------------------------------------------------------
     - name: Decodificar Keystore
       run: |
-        Write-Host "🛠️ Procesando archivo de firmas..."
-        # Convertir cadena Base64 a arreglo de bytes
+        Write-Host "Procesando archivo de firmas..."
         $bytes = [System.Convert]::FromBase64String($env:KEYSTORE_BASE64)
-        # Escribir bytes directamente en el archivo (evita corrupción por codificación de texto)
-        [System.IO.File]::WriteAllBytes("$PWD\popsmanager.keystore", $bytes)
-        Write-Host "✅ Archivo popsmanager.keystore generado correctamente."
+        [System.IO.File]::WriteAllBytes("$PWD/popsmanager.keystore", $bytes)
+        Write-Host "Archivo popsmanager.keystore generado correctamente."
       shell: pwsh
 
-    # 🔨 Compilar y firmar APK
+    # -----------------------------------------------------------
+    # 🔨 COMPILAR Y FIRMAR APK
+    # -----------------------------------------------------------
     - name: Compilar APK Firmado
       run: |
         dotnet publish POPSManager.Android/POPSManager.Android.csproj `
@@ -60,7 +69,9 @@ jobs:
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
-    # 📦 Subir APK firmado
+    # -----------------------------------------------------------
+    # 📦 SUBIR APK FIRMADO
+    # -----------------------------------------------------------
     - name: Subir artefacto APK
       uses: actions/upload-artifact@v4
       with:
