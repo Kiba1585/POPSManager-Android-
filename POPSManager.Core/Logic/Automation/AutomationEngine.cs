@@ -1,9 +1,9 @@
-using POPSManager.Settings;
-using POPSManager.Services;
+using POPSManager.Core.Settings;
+using POPSManager.Core.Services;
 using System;
 using System.Threading.Tasks;
 
-namespace POPSManager.Logic.Automation
+namespace POPSManager.Core.Logic.Automation
 {
     public sealed class AutomationEngine
     {
@@ -50,7 +50,6 @@ namespace POPSManager.Logic.Automation
 
                 _notify.Info($"¿Deseas permitir la acción: {actionName}?");
                 bool result = await OnAskUserAsync(actionName);
-
                 _log.Info($"[AUTO] {actionName}: usuario respondió → {result}");
                 return result;
             }
@@ -59,70 +58,27 @@ namespace POPSManager.Logic.Automation
             return false;
         }
 
-        // Conversión
-        public bool ShouldConvert() =>
-            DecideAsync("Conversión", _settings.Automation.Conversion).GetAwaiter().GetResult();
-        public Task<bool> ShouldConvertAsync() =>
-            DecideAsync("Conversión", _settings.Automation.Conversion);
-
-        // Base de datos
-        public bool ShouldUseDatabase() =>
-            DecideAsync("Base de datos", _settings.Automation.Database).GetAwaiter().GetResult();
-        public Task<bool> ShouldUseDatabaseAsync() =>
-            DecideAsync("Base de datos", _settings.Automation.Database);
-
-        // Carátulas
-        public bool ShouldDownloadCovers() =>
-            DecideAsync("Descarga de carátulas", _settings.Automation.Covers).GetAwaiter().GetResult();
-        public Task<bool> ShouldDownloadCoversAsync() =>
-            DecideAsync("Descarga de carátulas", _settings.Automation.Covers);
-
-        // Multidisco
-        public bool ShouldHandleMultiDisc() =>
-            DecideAsync("Multidisco", _settings.Automation.MultiDisc).GetAwaiter().GetResult();
-        public Task<bool> ShouldHandleMultiDiscAsync() =>
-            DecideAsync("Multidisco", _settings.Automation.MultiDisc);
-
-        // Cheats
-        public bool ShouldGenerateCheats() =>
-            DecideAsync("Generación de CHEAT.TXT", _settings.Automation.Cheats).GetAwaiter().GetResult();
-        public Task<bool> ShouldGenerateCheatsAsync() =>
-            DecideAsync("Generación de CHEAT.TXT", _settings.Automation.Cheats);
-
-        // Creación de carpetas
-        public bool ShouldCreateFolders() =>
-            DecideAsync("Creación de carpetas", _settings.Automation.FolderCreation).GetAwaiter().GetResult();
-        public Task<bool> ShouldCreateFoldersAsync() =>
-            DecideAsync("Creación de carpetas", _settings.Automation.FolderCreation);
-
-        // Notificaciones
-        public bool ShouldShowNotifications() =>
-            DecideAsync("Notificaciones", _settings.Automation.Notifications).GetAwaiter().GetResult();
-        public Task<bool> ShouldShowNotificationsAsync() =>
-            DecideAsync("Notificaciones", _settings.Automation.Notifications);
-
-        // ELF
-        public bool ShouldGenerateElf() =>
-            DecideAsync("Generación de ELF", _settings.Automation.ElfGeneration).GetAwaiter().GetResult();
-        public Task<bool> ShouldGenerateElfAsync() =>
-            DecideAsync("Generación de ELF", _settings.Automation.ElfGeneration);
-
-        // Metadatos
-        public bool ShouldUseMetadata() =>
-            DecideAsync("Generación de metadatos (.cfg)", _settings.Automation.Metadata).GetAwaiter().GetResult();
-        public Task<bool> ShouldUseMetadataAsync() =>
-            DecideAsync("Generación de metadatos (.cfg)", _settings.Automation.Metadata);
-
-        // LNG
-        public bool ShouldCopyLng() =>
-            DecideAsync("Copia de archivos LNG", _settings.Automation.Lng).GetAwaiter().GetResult();
-        public Task<bool> ShouldCopyLngAsync() =>
-            DecideAsync("Copia de archivos LNG", _settings.Automation.Lng);
-
-        // THM
-        public bool ShouldCopyThm() =>
-            DecideAsync("Copia de temas THM", _settings.Automation.Thm).GetAwaiter().GetResult();
-        public Task<bool> ShouldCopyThmAsync() =>
-            DecideAsync("Copia de temas THM", _settings.Automation.Thm);
+        public bool ShouldConvert() => DecideAsync("Conversión", _settings.Automation.Conversion).GetAwaiter().GetResult();
+        public Task<bool> ShouldConvertAsync() => DecideAsync("Conversión", _settings.Automation.Conversion);
+        public bool ShouldUseDatabase() => DecideAsync("Base de datos", _settings.Automation.Database).GetAwaiter().GetResult();
+        public Task<bool> ShouldUseDatabaseAsync() => DecideAsync("Base de datos", _settings.Automation.Database);
+        public bool ShouldDownloadCovers() => DecideAsync("Descarga de carátulas", _settings.Automation.Covers).GetAwaiter().GetResult();
+        public Task<bool> ShouldDownloadCoversAsync() => DecideAsync("Descarga de carátulas", _settings.Automation.Covers);
+        public bool ShouldHandleMultiDisc() => DecideAsync("Multidisco", _settings.Automation.MultiDisc).GetAwaiter().GetResult();
+        public Task<bool> ShouldHandleMultiDiscAsync() => DecideAsync("Multidisco", _settings.Automation.MultiDisc);
+        public bool ShouldGenerateCheats() => DecideAsync("Generación de CHEAT.TXT", _settings.Automation.Cheats).GetAwaiter().GetResult();
+        public Task<bool> ShouldGenerateCheatsAsync() => DecideAsync("Generación de CHEAT.TXT", _settings.Automation.Cheats);
+        public bool ShouldCreateFolders() => DecideAsync("Creación de carpetas", _settings.Automation.FolderCreation).GetAwaiter().GetResult();
+        public Task<bool> ShouldCreateFoldersAsync() => DecideAsync("Creación de carpetas", _settings.Automation.FolderCreation);
+        public bool ShouldShowNotifications() => DecideAsync("Notificaciones", _settings.Automation.Notifications).GetAwaiter().GetResult();
+        public Task<bool> ShouldShowNotificationsAsync() => DecideAsync("Notificaciones", _settings.Automation.Notifications);
+        public bool ShouldGenerateElf() => DecideAsync("Generación de ELF", _settings.Automation.ElfGeneration).GetAwaiter().GetResult();
+        public Task<bool> ShouldGenerateElfAsync() => DecideAsync("Generación de ELF", _settings.Automation.ElfGeneration);
+        public bool ShouldUseMetadata() => DecideAsync("Generación de metadatos (.cfg)", _settings.Automation.Metadata).GetAwaiter().GetResult();
+        public Task<bool> ShouldUseMetadataAsync() => DecideAsync("Generación de metadatos (.cfg)", _settings.Automation.Metadata);
+        public bool ShouldCopyLng() => DecideAsync("Copia de archivos LNG", _settings.Automation.Lng).GetAwaiter().GetResult();
+        public Task<bool> ShouldCopyLngAsync() => DecideAsync("Copia de archivos LNG", _settings.Automation.Lng);
+        public bool ShouldCopyThm() => DecideAsync("Copia de temas THM", _settings.Automation.Thm).GetAwaiter().GetResult();
+        public Task<bool> ShouldCopyThmAsync() => DecideAsync("Copia de temas THM", _settings.Automation.Thm);
     }
 }
