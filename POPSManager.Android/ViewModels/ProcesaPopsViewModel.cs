@@ -5,7 +5,7 @@ using POPSManager.Core.Services;
 
 namespace POPSManager.Android.ViewModels;
 
-public class ProcessPopsViewModel : ObservableObject
+public class ProcessPopsViewModel : BindableObject
 {
     private readonly IPathsService _paths;
     private readonly GameProcessor _processor;
@@ -21,8 +21,16 @@ public class ProcessPopsViewModel : ObservableObject
     public ICommand SelectFolderCommand { get; }
     public ICommand ProcessCommand { get; }
 
-    public string Status { get => _status; set => SetProperty(ref _status, value); }
-    public bool CanProcess { get => _canProcess; set => SetProperty(ref _canProcess, value); }
+    public string Status
+    {
+        get => _status;
+        set { if (_status != value) { _status = value; OnPropertyChanged(); } }
+    }
+    public bool CanProcess
+    {
+        get => _canProcess;
+        set { if (_canProcess != value) { _canProcess = value; OnPropertyChanged(); } }
+    }
 
     public ProcessPopsViewModel(IPathsService paths, GameProcessor processor)
     {
@@ -44,8 +52,7 @@ public class ProcessPopsViewModel : ObservableObject
     {
         if (_selectedFolder == null) return;
         Status = "Procesando...";
-        var games = await _processor.DetectGamesAsync(_selectedFolder);
-        await _processor.ProcessGamesAsync(_selectedFolder, games, _paths.PopsFolder);
+        await _processor.ProcessFolderAsync(_selectedFolder);
         Status = "Procesamiento completado.";
     }
 }
