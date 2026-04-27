@@ -35,12 +35,11 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 🔑 CONFIGURAR SDK DE ANDROID Y ACEPTAR LICENCIAS
+    # 🔑 INSTALAR SDK DE ANDROID Y ACEPTAR LICENCIAS (OBLIGATORIO)
     # -----------------------------------------------------------
     - name: Instalar y configurar SDK de Android
       run: |
         $androidSdkRoot = Join-Path $env:USERPROFILE "android\sdk"
-        Write-Host "##[add-path]$androidSdkRoot\cmdline-tools\latest\bin"
         echo "ANDROID_HOME=$androidSdkRoot" >> $env:GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$androidSdkRoot" >> $env:GITHUB_ENV
         
@@ -88,7 +87,7 @@ jobs:
       run: dotnet clean POPSManager.sln --configuration Release
 
     # -----------------------------------------------------------
-    # 🔍 ELIMINAR DUPLICADOS DE VIEWMODELS
+    # 🔍 ELIMINAR DUPLICADOS DE VIEWMODELS (si aplica)
     # -----------------------------------------------------------
     - name: Eliminar archivos duplicados de LogEntry y HomeViewModel
       run: |
@@ -121,7 +120,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 GENERAR APK FIRMADO (PUBLISH con RID y formato APK)
+    # 🔨 GENERAR APK FIRMADO
     # -----------------------------------------------------------
     - name: Generar APK firmado (publish)
       run: |
@@ -142,9 +141,9 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 🔍 DIAGNÓSTICO: LISTAR ARCHIVOS GENERADOS (opcional)
+    # 🔍 DIAGNÓSTICO (opcional pero útil)
     # -----------------------------------------------------------
-    - name: Listar archivos generados (APK/AAB)
+    - name: Listar archivos generados
       run: |
         Write-Host "Buscando APKs y AABs..."
         Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android" -Recurse -Include *.apk,*.aab | ForEach-Object {
@@ -153,7 +152,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 📁 COPIAR APK A LA CARPETA publish
+    # 📁 COPIAR APK
     # -----------------------------------------------------------
     - name: Copiar APK generado
       run: |
@@ -168,7 +167,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 📦 SUBIR APK COMO ARTEFACTO
+    # 📦 SUBIR ARTEFACTO
     # -----------------------------------------------------------
     - name: Subir artefacto APK
       uses: actions/upload-artifact@v4
