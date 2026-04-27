@@ -35,7 +35,7 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 📦 CONFIGURAR SDK DE ANDROID (CON --accept_license)
+    # 📦 CONFIGURAR SDK DE ANDROID (LICENCIAS AUTOMÁTICAS)
     # -----------------------------------------------------------
     - name: Configurar Android SDK
       run: |
@@ -80,10 +80,17 @@ jobs:
         Get-ChildItem -Path $sdkSource.FullName | Copy-Item -Destination $latestDir -Recurse -Force
 
         $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
-        Write-Host "Instalando plataformas y aceptando licencias (sin interacción)..."
-        
-        # Instalar las dependencias necesarias con aceptación automática
-        cmd /c "`"$sdkManager`" --install `"platforms;android-34`" `"build-tools;34.0.0`" --accept_license"
+
+        # Crear archivo de entrada con muchas 'y' para aceptar todas las licencias
+        $yesFile = "$env:TEMP\yes.txt"
+        Set-Content -Path $yesFile -Value ("y`n" * 20)   # 20 líneas 'y' son más que suficientes
+
+        Write-Host "Aceptando licencias (no interactivo)..."
+        Get-Content $yesFile | cmd /c "`"$sdkManager`" --licenses"
+
+        # Instalar plataformas y herramientas necesarias
+        Write-Host "Instalando plataformas Android..."
+        cmd /c "`"$sdkManager`" `"platforms;android-34`" `"build-tools;34.0.0`""
 
         # Variables de entorno
         "ANDROID_HOME=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
@@ -164,7 +171,7 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 🔍 DIAGNÓSTICO (OPCIONAL PERO ÚTIL)
+    # 🔍 DIAGNÓSTICO (OPCIONAL)
     # -----------------------------------------------------------
     - name: Listar archivos generados
       run: |
