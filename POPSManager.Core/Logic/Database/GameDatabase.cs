@@ -6,15 +6,14 @@ namespace POPSManager.Core.Logic
 {
     public static class GameDatabase
     {
-        private static readonly Dictionary<string, GameEntry> Cache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, Models.GameEntry> Cache = new(StringComparer.OrdinalIgnoreCase);
 
-        public static bool TryGetEntry(string gameId, out GameEntry? entry)
+        public static bool TryGetEntry(string gameId, out Models.GameEntry? entry)
         {
             entry = null;
             if (string.IsNullOrWhiteSpace(gameId)) return false;
             if (Cache.TryGetValue(gameId, out var cached)) { entry = cached; return true; }
 
-            // Cargar desde recursos embebidos si existen
             var asm = Assembly.GetExecutingAssembly();
             foreach (var res in asm.GetManifestResourceNames())
             {
@@ -28,16 +27,5 @@ namespace POPSManager.Core.Logic
         }
 
         public static string? TryGetCover(string gameId) => null;
-    }
-
-    public class GameEntry
-    {
-        public string GameId { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string? CoverUrl { get; set; }
-        public string[]? CheatFixes { get; set; }
-        public string[]? Tags { get; set; }
-        public string Publisher { get; set; } = "";
-        public int Year { get; set; }
     }
 }
