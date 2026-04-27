@@ -1,7 +1,7 @@
 name: Build Android (MAUI)
 
 permissions:
-  contents: write
+  contents: write          # Necesario para crear releases
 
 on:
   push:
@@ -67,7 +67,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 📦 RESTAURAR PROYECTOS
+    # 📦 RESTAURAR PROYECTOS (desde cero)
     # -----------------------------------------------------------
     - name: Restaurar solución
       run: dotnet restore POPSManager.sln
@@ -84,7 +84,7 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 COMPILAR Y FIRMAR APK
+    # 🔨 COMPILAR Y FIRMAR APK (SALIDA A ./publish)
     # -----------------------------------------------------------
     - name: Compilar APK Firmado
       run: |
@@ -103,7 +103,16 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 📦 SUBIR APK FIRMADO (ARTEFACTO)
+    # 🔎 DIAGNÓSTICO: VER QUÉ ARCHIVOS SE PUBLICARON REALMENTE
+    # -----------------------------------------------------------
+    - name: 🔎 Diagnosticar salida de publish
+      run: |
+        Write-Host "Contenido de publish:"
+        Get-ChildItem -Recurse publish | Select-Object FullName
+      shell: pwsh
+
+    # -----------------------------------------------------------
+    # 📦 SUBIR APK FIRMADO COMO ARTEFACTO
     # -----------------------------------------------------------
     - name: Subir artefacto APK
       uses: actions/upload-artifact@v4
