@@ -35,9 +35,9 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 📦 CONFIGURAR SDK DE ANDROID COMPLETO
+    # 📦 CONFIGURAR SDK DE ANDROID (CON --accept_license)
     # -----------------------------------------------------------
-    - name: Configurar Android SDK y aceptar licencias
+    - name: Configurar Android SDK
       run: |
         $sdkRoot = "C:\Android\android-sdk"
 
@@ -53,7 +53,7 @@ jobs:
         # Crear directorio real raíz
         New-Item -ItemType Directory -Force -Path $sdkRoot | Out-Null
 
-        # Descargar command-line tools (última versión estable de Google)
+        # Descargar command-line tools
         $zipUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
         $zipPath = "$env:TEMP\cmdline-tools.zip"
         $extractPath = "$env:TEMP\cmdline-tools-extract"
@@ -61,43 +61,29 @@ jobs:
         Write-Host "Descargando Android SDK command-line tools..."
         Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
 
-        Write-Host "Extrayendo en $extractPath..."
+        Write-Host "Extrayendo..."
         Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
 
-        # Buscar la carpeta que contiene bin\sdkmanager.bat
+        # Buscar carpeta que contiene bin\sdkmanager.bat
         $sdkSource = Get-ChildItem -Path $extractPath -Directory -Recurse | Where-Object {
             Test-Path (Join-Path $_.FullName "bin\sdkmanager.bat")
         } | Select-Object -First 1
 
         if (-not $sdkSource) {
-            Write-Host "No se encontró bin\sdkmanager.bat en el contenido extraído."
+            Write-Host "No se encontró sdkmanager.bat. Abortando."
             exit 1
         }
 
-        Write-Host "Carpeta fuente del SDK: $($sdkSource.FullName)"
-
-        # Definir destino final: cmdline-tools\latest
+        # Mover a cmdline-tools\latest
         $latestDir = Join-Path $sdkRoot "cmdline-tools\latest"
-
-        # Crear el directorio completo (incluyendo padres)
         New-Item -ItemType Directory -Force -Path $latestDir | Out-Null
-
-        # Copiar el contenido del SDK fuente al destino
         Get-ChildItem -Path $sdkSource.FullName | Copy-Item -Destination $latestDir -Recurse -Force
 
         $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
-        if (-not (Test-Path $sdkManager)) {
-            Write-Host "No se encontró sdkmanager.bat después de copiar. Abortando."
-            exit 1
-        }
-
-        # Aceptar licencias
-        Write-Host "Aceptando licencias..."
-        cmd /c "(echo y & echo y & echo y & echo y & echo y & echo y & echo y & echo y) | `"$sdkManager`" --licenses"
-
-        # Instalar plataforma Android 34
-        Write-Host "Instalando plataforma android-34..."
-        cmd /c "`"$sdkManager`" `"platforms;android-34`""
+        Write-Host "Instalando plataformas y aceptando licencias (sin interacción)..."
+        
+        # Instalar las dependencias necesarias con aceptación automática
+        cmd /c "`"$sdkManager`" --install `"platforms;android-34`" `"build-tools;34.0.0`" --accept_license"
 
         # Variables de entorno
         "ANDROID_HOME=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
@@ -178,7 +164,7 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 🔍 DIAGNÓSTICO (OPCIONAL)
+    # 🔍 DIAGNÓSTICO (OPCIONAL PERO ÚTIL)
     # -----------------------------------------------------------
     - name: Listar archivos generados
       run: |
