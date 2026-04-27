@@ -17,7 +17,7 @@ jobs:
       uses: actions/checkout@v4
 
     # -----------------------------------------------------------
-    # 🔥 ELIMINAR .NET 10 PREINSTALADO
+    # 🔥 ELIMINAR .NET PREINSTALADO (si no es .NET 8)
     # -----------------------------------------------------------
     - name: Eliminar .NET preinstalado
       run: Remove-Item -Recurse -Force "C:\Program Files\dotnet"
@@ -84,11 +84,11 @@ jobs:
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 COMPILAR (genera el APK)
+    # 🔨 GENERAR APK FIRMADO (PUBLISH, NO BUILD)
     # -----------------------------------------------------------
-    - name: Compilar APK Firmado
+    - name: Generar APK firmado (publish)
       run: |
-        dotnet build POPSManager.Android/POPSManager.Android.csproj `
+        dotnet publish POPSManager.Android/POPSManager.Android.csproj `
           -c Release `
           -f net8.0-android `
           /p:AndroidKeyStore=true `
@@ -102,17 +102,17 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 📁 COPIAR APK A LA CARPETA publish
+    # 📁 COPIAR APK A LA CARPETA publish (desde subcarpeta de publish)
     # -----------------------------------------------------------
     - name: Copiar APK generado
       run: |
         New-Item -ItemType Directory -Force -Path publish
-        $apk = Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android" -Filter "*.apk" -Recurse | Select-Object -First 1
+        $apk = Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android\publish" -Filter "*.apk" -Recurse | Select-Object -First 1
         if ($apk) {
           Copy-Item $apk.FullName publish\
           Write-Host "APK copiado: $($apk.FullName)"
         } else {
-          Write-Host "No se encontró ningún APK en la carpeta de salida."
+          Write-Host "No se encontró ningún APK en la carpeta de publicación."
         }
       shell: pwsh
 
