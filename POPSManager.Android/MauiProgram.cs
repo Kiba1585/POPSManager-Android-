@@ -3,6 +3,7 @@ using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using POPSManager.Android.Services;
 using POPSManager.Core.Services;
+using POPSManager.Core.Services.Interfaces;   // <-- añadido para INotificationService
 using POPSManager.Core.Localization;
 using POPSManager.Core.Logic.Automation;
 using POPSManager.Core.Settings;
