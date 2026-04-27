@@ -35,7 +35,7 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
-    # 📦 CONFIGURAR SDK DE ANDROID COMPLETO (CORREGIDO)
+    # 📦 CONFIGURAR SDK DE ANDROID COMPLETO
     # -----------------------------------------------------------
     - name: Configurar Android SDK y aceptar licencias
       run: |
@@ -50,15 +50,15 @@ jobs:
             }
         }
 
-        # Crear directorio real
+        # Crear directorio real raíz
         New-Item -ItemType Directory -Force -Path $sdkRoot | Out-Null
 
-        # Descargar command-line tools (versión reciente)
+        # Descargar command-line tools (última versión estable de Google)
         $zipUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
         $zipPath = "$env:TEMP\cmdline-tools.zip"
         $extractPath = "$env:TEMP\cmdline-tools-extract"
 
-        Write-Host "Descargando Android SDK command-line tools desde $zipUrl..."
+        Write-Host "Descargando Android SDK command-line tools..."
         Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
 
         Write-Host "Extrayendo en $extractPath..."
@@ -76,16 +76,18 @@ jobs:
 
         Write-Host "Carpeta fuente del SDK: $($sdkSource.FullName)"
 
-        # Mover a cmdline-tools\latest
+        # Definir destino final: cmdline-tools\latest
         $latestDir = Join-Path $sdkRoot "cmdline-tools\latest"
-        if (Test-Path $latestDir) {
-            Remove-Item -Recurse -Force $latestDir
-        }
-        Move-Item -Path $sdkSource.FullName -Destination $latestDir
+
+        # Crear el directorio completo (incluyendo padres)
+        New-Item -ItemType Directory -Force -Path $latestDir | Out-Null
+
+        # Copiar el contenido del SDK fuente al destino
+        Get-ChildItem -Path $sdkSource.FullName | Copy-Item -Destination $latestDir -Recurse -Force
 
         $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
         if (-not (Test-Path $sdkManager)) {
-            Write-Host "No se encontró sdkmanager.bat después de mover. Abortando."
+            Write-Host "No se encontró sdkmanager.bat después de copiar. Abortando."
             exit 1
         }
 
@@ -97,7 +99,7 @@ jobs:
         Write-Host "Instalando plataforma android-34..."
         cmd /c "`"$sdkManager`" `"platforms;android-34`""
 
-        # Variables de entorno para pasos siguientes
+        # Variables de entorno
         "ANDROID_HOME=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
         "ANDROID_SDK_ROOT=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
 
