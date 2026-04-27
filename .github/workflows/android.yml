@@ -35,6 +35,25 @@ jobs:
       run: dotnet workload install maui
 
     # -----------------------------------------------------------
+    # 🔑 ACEPTAR LICENCIAS DEL SDK DE ANDROID (OBLIGATORIO)
+    # -----------------------------------------------------------
+    - name: Aceptar licencias de Android SDK
+      run: |
+        $androidSdkPath = $env:ANDROID_HOME
+        if (-not $androidSdkPath) {
+          $androidSdkPath = Join-Path $env:USERPROFILE "android\sdk"
+        }
+        $sdkManager = Join-Path $androidSdkPath "cmdline-tools\latest\bin\sdkmanager.bat"
+        if (Test-Path $sdkManager) {
+          Write-Host "Aceptando licencias..."
+          & $sdkManager --licenses --verbose < $null
+          Write-Host "Licencias aceptadas."
+        } else {
+          Write-Host "No se encontró sdkmanager en $sdkManager. Verifica la instalación de workload maui."
+        }
+      shell: pwsh
+
+    # -----------------------------------------------------------
     # 🧹 LIMPIEZA TOTAL
     # -----------------------------------------------------------
     - name: Limpiar caché NuGet
@@ -79,22 +98,24 @@ jobs:
       run: |
         Write-Host "Procesando archivo de firmas..."
         $bytes = [System.Convert]::FromBase64String($env:KEYSTORE_BASE64)
-        [System.IO.File]::WriteAllBytes("$PWD/popsmanager.keystore", $bytes)
-        Write-Host "Archivo popsmanager.keystore generado correctamente."
+        $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
+        [System.IO.File]::WriteAllBytes($keystorePath, $bytes)
+        Write-Host "Archivo popsmanager.keystore generado en $keystorePath"
       shell: pwsh
 
     # -----------------------------------------------------------
-    # 🔨 GENERAR APK FIRMADO (PUBLISH con RID y formato APK)
+    # 🔨 GENERAR APK FIRMADO (PUBLISH con ruta absoluta de keystore)
     # -----------------------------------------------------------
     - name: Generar APK firmado (publish)
       run: |
+        $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
         dotnet publish POPSManager.Android/POPSManager.Android.csproj `
           -c Release `
           -f net8.0-android `
           -r android-arm64 `
           /p:AndroidPackageFormat=apk `
           /p:AndroidKeyStore=true `
-          /p:AndroidSigningKeyStore=popsmanager.keystore `
+          /p:AndroidSigningKeyStore="$keystorePath" `
           /p:AndroidSigningKeyAlias=$env:KEY_ALIAS `
           /p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
           /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD
