@@ -49,21 +49,16 @@ jobs:
       run: dotnet clean POPSManager.sln --configuration Release
 
     # -----------------------------------------------------------
-    # 🔍 DIAGNÓSTICO Y ELIMINACIÓN DE DUPLICADOS DE HomeViewModel
+    # 🔍 ELIMINAR CUALQUIER DEFINICIÓN DUPLICADA DE LogEntry Y HomeViewModel
     # -----------------------------------------------------------
-    - name: Mostrar archivos duplicados de HomeViewModel
+    - name: Eliminar archivos duplicados de LogEntry y HomeViewModel
       run: |
-        Write-Host "=== Buscando archivos con class HomeViewModel ==="
-        Get-ChildItem -Recurse -Filter *.cs -Path POPSManager.Android | Select-String "class HomeViewModel"
-      shell: pwsh
-
-    - name: Eliminar copias de HomeViewModel fuera de ViewModels
-      run: |
-        $files = Get-ChildItem -Recurse -Filter "HomeViewModel.cs" -Path POPSManager.Android
-        foreach ($file in $files) {
-          if ($file.DirectoryName -notmatch "ViewModels") {
-            Write-Host "Eliminando duplicado: $($file.FullName)"
-            Remove-Item -Force $file.FullName
+        $oficial = "POPSManager.Android\ViewModels\HomeViewModel.cs"
+        Get-ChildItem -Recurse -Filter *.cs -Path POPSManager.Android | ForEach-Object {
+          $contenido = Get-Content $_.FullName -Raw
+          if (($contenido -match "class LogEntry" -or $contenido -match "class HomeViewModel") -and ($_.FullName -notmatch [regex]::Escape($oficial))) {
+            Write-Host "Eliminando archivo duplicado: $($_.FullName)"
+            Remove-Item -Force $_.FullName
           }
         }
       shell: pwsh
