@@ -104,7 +104,18 @@ jobs:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
     # -----------------------------------------------------------
-    # 📁 COPIAR APK A LA CARPETA publish (búsqueda recursiva)
+    # 🔍 DIAGNÓSTICO: LISTAR ARCHIVOS GENERADOS
+    # -----------------------------------------------------------
+    - name: Listar archivos generados (APK/AAB)
+      run: |
+        Write-Host "Buscando APKs y AABs..."
+        Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android" -Recurse -Include *.apk,*.aab | ForEach-Object {
+          Write-Host "Encontrado: $($_.FullName)"
+        }
+      shell: pwsh
+
+    # -----------------------------------------------------------
+    # 📁 COPIAR APK A LA CARPETA publish
     # -----------------------------------------------------------
     - name: Copiar APK generado
       run: |
