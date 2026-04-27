@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using POPSManager.Core.Services;
+using POPSManager.Core.Services.Interfaces;  // <-- AÑADIDO
 
 namespace POPSManager.Android.ViewModels;
 
@@ -15,7 +16,6 @@ public class HomeViewModel : BindableObject
 {
     private readonly IPathsService _paths;
     private readonly ILoggingService _log;
-    private readonly INotificationService _notify;
     private readonly ConverterService _converter;
     private readonly SettingsService _settings;
 
@@ -27,12 +27,10 @@ public class HomeViewModel : BindableObject
     private bool _processSubfolders = true;
     private string _systemInfo = "";
 
-    public HomeViewModel(IPathsService paths, ILoggingService log, INotificationService notify,
-                          ConverterService converter, SettingsService settings)
+    public HomeViewModel(IPathsService paths, ILoggingService log, ConverterService converter, SettingsService settings)
     {
         _paths = paths;
         _log = log;
-        _notify = notify;
         _converter = converter;
         _settings = settings;
 
