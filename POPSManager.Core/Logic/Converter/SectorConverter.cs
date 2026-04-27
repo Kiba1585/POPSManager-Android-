@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace POPSManager.Logic
+namespace POPSManager.Core.Logic.Converter
 {
     public static class SectorConverter
     {
@@ -37,15 +37,8 @@ namespace POPSManager.Logic
         {
             switch (mode)
             {
-                case SectorMode.Mode1:
-                    Array.Copy(sector, 16, userData, 0, 2048);
-                    break;
-
-                case SectorMode.Mode2Form1:
-                case SectorMode.Mode2Form2:
-                case SectorMode.Raw2448:
-                    Array.Copy(sector, 24, userData, 0, 2048);
-                    break;
+                case SectorMode.Mode1: Array.Copy(sector, 16, userData, 0, 2048); break;
+                default: Array.Copy(sector, 24, userData, 0, 2048); break;
             }
         }
     }
