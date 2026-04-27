@@ -1,3 +1,4 @@
+using POPSManager.Core.UI.Progress;
 using System;
 using System.Collections.Generic;
 using System.IO;
