@@ -1,109 +1,223 @@
-name: Build Android App
+name: Build Android (MAUI)
+
+permissions:
+  contents: write
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: windows-latest   # o windows-2022
+  build-android:
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout del repositorio
+      uses: actions/checkout@v4
 
-      - name: Setup .NET (si es MAUI / Xamarin)
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
+    # -----------------------------------------------------------
+    # 🔥 ELIMINAR .NET PREINSTALADO
+    # -----------------------------------------------------------
+    - name: Eliminar .NET preinstalado
+      run: Remove-Item -Recurse -Force "C:\Program Files\dotnet"
+      shell: pwsh
 
-      - name: Setup Java (necesario para Android)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'microsoft'
-          java-version: '17'
+    # -----------------------------------------------------------
+    # 🔧 CONFIGURAR .NET 8
+    # -----------------------------------------------------------
+    - name: Instalar SDK de .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
 
-      - name: Configurar Android SDK
-        shell: pwsh
-        run: |
-          $sdkRoot = "C:\Android\android-sdk"
+    - name: Instalar carga de trabajo MAUI
+      run: dotnet workload install maui
 
-          # Eliminar enlace simbólico roto si existe
-          if (Test-Path $sdkRoot -PathType Container) {
-              $item = Get-Item $sdkRoot -Force
-              if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-                  Write-Host "Eliminando enlace simbólico roto en $sdkRoot"
-                  Remove-Item -LiteralPath $sdkRoot -Force -Recurse -ErrorAction SilentlyContinue
-              }
+    # -----------------------------------------------------------
+    # 📦 CONFIGURAR SDK DE ANDROID COMPLETO (CORREGIDO)
+    # -----------------------------------------------------------
+    - name: Configurar Android SDK y aceptar licencias
+      run: |
+        $sdkRoot = "C:\Android\android-sdk"
+
+        # Eliminar enlace simbólico roto si existe
+        if (Test-Path $sdkRoot -PathType Container) {
+            $item = Get-Item $sdkRoot -Force
+            if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                Write-Host "Eliminando enlace simbólico roto en $sdkRoot"
+                Remove-Item -LiteralPath $sdkRoot -Force -Recurse -ErrorAction SilentlyContinue
+            }
+        }
+
+        # Crear directorio real
+        New-Item -ItemType Directory -Force -Path $sdkRoot | Out-Null
+
+        # Descargar command-line tools (versión reciente)
+        $zipUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+        $zipPath = "$env:TEMP\cmdline-tools.zip"
+        $extractPath = "$env:TEMP\cmdline-tools-extract"
+
+        Write-Host "Descargando Android SDK command-line tools desde $zipUrl..."
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+
+        Write-Host "Extrayendo en $extractPath..."
+        Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+
+        # Buscar la carpeta que contiene bin\sdkmanager.bat
+        $sdkSource = Get-ChildItem -Path $extractPath -Directory -Recurse | Where-Object {
+            Test-Path (Join-Path $_.FullName "bin\sdkmanager.bat")
+        } | Select-Object -First 1
+
+        if (-not $sdkSource) {
+            Write-Host "No se encontró bin\sdkmanager.bat en el contenido extraído."
+            exit 1
+        }
+
+        Write-Host "Carpeta fuente del SDK: $($sdkSource.FullName)"
+
+        # Mover a cmdline-tools\latest
+        $latestDir = Join-Path $sdkRoot "cmdline-tools\latest"
+        if (Test-Path $latestDir) {
+            Remove-Item -Recurse -Force $latestDir
+        }
+        Move-Item -Path $sdkSource.FullName -Destination $latestDir
+
+        $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
+        if (-not (Test-Path $sdkManager)) {
+            Write-Host "No se encontró sdkmanager.bat después de mover. Abortando."
+            exit 1
+        }
+
+        # Aceptar licencias
+        Write-Host "Aceptando licencias..."
+        cmd /c "(echo y & echo y & echo y & echo y & echo y & echo y & echo y & echo y) | `"$sdkManager`" --licenses"
+
+        # Instalar plataforma Android 34
+        Write-Host "Instalando plataforma android-34..."
+        cmd /c "`"$sdkManager`" `"platforms;android-34`""
+
+        # Variables de entorno para pasos siguientes
+        "ANDROID_HOME=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
+        "ANDROID_SDK_ROOT=$sdkRoot" | Out-File -Append $env:GITHUB_ENV
+
+        Write-Host "Configuración de SDK de Android completada."
+      shell: pwsh
+
+    # -----------------------------------------------------------
+    # 🧹 LIMPIEZA TOTAL
+    # -----------------------------------------------------------
+    - name: Limpiar caché NuGet
+      run: dotnet nuget locals all --clear
+
+    - name: Eliminar carpetas bin/obj locales
+      run: |
+        Remove-Item -Recurse -Force POPSManager.Android\bin -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force POPSManager.Android\obj -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force POPSManager.Core\bin -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force POPSManager.Core\obj -ErrorAction SilentlyContinue
+      shell: pwsh
+
+    - name: Limpiar compilaciones anteriores
+      run: dotnet clean POPSManager.sln --configuration Release
+
+    # -----------------------------------------------------------
+    # 🔍 ELIMINAR DUPLICADOS DE VIEWMODELS
+    # -----------------------------------------------------------
+    - name: Eliminar archivos duplicados de LogEntry y HomeViewModel
+      run: |
+        $oficial = "POPSManager.Android\ViewModels\HomeViewModel.cs"
+        Get-ChildItem -Recurse -Filter *.cs -Path POPSManager.Android | ForEach-Object {
+          $contenido = Get-Content $_.FullName -Raw
+          if (($contenido -match "class LogEntry" -or $contenido -match "class HomeViewModel") -and ($_.FullName -notmatch [regex]::Escape($oficial))) {
+            Write-Host "Eliminando archivo duplicado: $($_.FullName)"
+            Remove-Item -Force $_.FullName
           }
+        }
+      shell: pwsh
 
-          # Crear directorio real
-          New-Item -ItemType Directory -Force -Path $sdkRoot
+    # -----------------------------------------------------------
+    # 📦 RESTAURAR
+    # -----------------------------------------------------------
+    - name: Restaurar solución
+      run: dotnet restore POPSManager.sln
 
-          # Descargar command-line tools
-          $zipUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
-          $zipPath = "$env:TEMP\cmdline-tools.zip"
-          $extractPath = "$env:TEMP\cmdline-tools-extract"
+    # -----------------------------------------------------------
+    # 🔐 DECODIFICAR KEYSTORE
+    # -----------------------------------------------------------
+    - name: Decodificar Keystore
+      run: |
+        Write-Host "Procesando archivo de firmas..."
+        $bytes = [System.Convert]::FromBase64String($env:KEYSTORE_BASE64)
+        $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
+        [System.IO.File]::WriteAllBytes($keystorePath, $bytes)
+        Write-Host "Archivo popsmanager.keystore generado en $keystorePath"
+      shell: pwsh
 
-          Write-Host "Descargando Android SDK command-line tools desde $zipUrl..."
-          Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+    # -----------------------------------------------------------
+    # 🔨 GENERAR APK FIRMADO (PUBLISH)
+    # -----------------------------------------------------------
+    - name: Generar APK firmado (publish)
+      run: |
+        $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
+        dotnet publish POPSManager.Android/POPSManager.Android.csproj `
+          -c Release `
+          -f net8.0-android `
+          -r android-arm64 `
+          /p:AndroidPackageFormat=apk `
+          /p:AndroidKeyStore=true `
+          /p:AndroidSigningKeyStore="$keystorePath" `
+          /p:AndroidSigningKeyAlias=$env:KEY_ALIAS `
+          /p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
+          /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD
+      env:
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
-          Write-Host "Extrayendo..."
-          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+    # -----------------------------------------------------------
+    # 🔍 DIAGNÓSTICO (OPCIONAL)
+    # -----------------------------------------------------------
+    - name: Listar archivos generados
+      run: |
+        Write-Host "Buscando APKs y AABs..."
+        Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android" -Recurse -Include *.apk,*.aab | ForEach-Object {
+          Write-Host "Encontrado: $($_.FullName)"
+        }
+      shell: pwsh
 
-          # Mostrar estructura extraída (para diagnóstico)
-          Write-Host "Contenido de $extractPath:"
-          Get-ChildItem -Path $extractPath
+    # -----------------------------------------------------------
+    # 📁 COPIAR APK
+    # -----------------------------------------------------------
+    - name: Copiar APK generado
+      run: |
+        New-Item -ItemType Directory -Force -Path publish
+        $apk = Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android" -Filter "*.apk" -Recurse | Select-Object -First 1
+        if ($apk) {
+          Copy-Item $apk.FullName publish\
+          Write-Host "APK copiado: $($apk.FullName)"
+        } else {
+          Write-Host "No se encontró ningún APK en la carpeta de salida."
+        }
+      shell: pwsh
 
-          # Buscar la carpeta que contiene bin/sdkmanager.bat
-          $sdkSource = Get-ChildItem -Path $extractPath -Directory -Recurse | Where-Object {
-              Test-Path (Join-Path $_.FullName "bin\sdkmanager.bat")
-          } | Select-Object -First 1
+    # -----------------------------------------------------------
+    # 📦 SUBIR ARTEFACTO
+    # -----------------------------------------------------------
+    - name: Subir artefacto APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: POPSManager-Android-Signed
+        path: publish/**/*.apk
 
-          if (-not $sdkSource) {
-              Write-Host "No se encontró bin/sdkmanager.bat en el contenido extraído. Abortando."
-              exit 1
-          }
-
-          Write-Host "Carpeta encontrada: $($sdkSource.FullName)"
-
-          # Definir destino final: cmdline-tools\latest
-          $latestDir = Join-Path $sdkRoot "cmdline-tools\latest"
-          if (Test-Path $latestDir) {
-              Remove-Item -Recurse -Force $latestDir
-          }
-
-          # Mover el contenido de la carpeta fuente al destino
-          Write-Host "Moviendo $($sdkSource.FullName) a $latestDir"
-          Move-Item -Path $sdkSource.FullName -Destination $latestDir
-
-          $sdkManager = Join-Path $latestDir "bin\sdkmanager.bat"
-
-          if (-not (Test-Path $sdkManager)) {
-              Write-Host "No se encontró sdkmanager.bat después de mover. Abortando."
-              exit 1
-          }
-
-          # Aceptar licencias
-          Write-Host "Aceptando licencias..."
-          cmd /c "(echo y & echo y & echo y & echo y & echo y & echo y & echo y & echo y) | `"$sdkManager`" --licenses"
-
-          # Instalar plataforma Android 34
-          Write-Host "Instalando plataforma android-34..."
-          cmd /c "`"$sdkManager`" `"platforms;android-34`""
-
-          # Establecer variables de entorno para pasos siguientes
-          Write-Host "ANDROID_HOME=$sdkRoot" >> $env:GITHUB_ENV
-          Write-Host "ANDROID_SDK_ROOT=$sdkRoot" >> $env:GITHUB_ENV
-
-          Write-Host "Configuración de SDK de Android completada."
-
-      - name: Restaurar dependencias .NET
-        run: dotnet restore
-
-      - name: Compilar aplicación Android
-        run: dotnet build -c Release -f net8.0-android
-
-      # Opcional: firmar y generar APK/AAB
+    # -----------------------------------------------------------
+    # 🚀 CREAR RELEASE
+    # -----------------------------------------------------------
+    - name: Crear Release y subir APK
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ github.run_number }}
+        name: "Android Build v${{ github.run_number }}"
+        files: publish/**/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
