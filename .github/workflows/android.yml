@@ -1,107 +1,105 @@
 name: Build Android (MAUI)
 
 permissions:
-contents: write
+  contents: write
 
 on:
-push:
-branches: [ "main" ]
-workflow_dispatch:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-build-android:
-runs-on: windows-latest
+  build-android:
+    runs-on: windows-latest
 
-steps:
-- name: Checkout
-  uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-# 🔧 .NET
-- name: Setup .NET 8
-  uses: actions/setup-dotnet@v4
-  with:
-    dotnet-version: 8.0.x
+      # 🔧 .NET
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
 
-# 🔧 Java (OBLIGATORIO)
-- name: Setup Java 17
-  uses: actions/setup-java@v4
-  with:
-    distribution: 'microsoft'
-    java-version: '17'
+      # 🔧 Java (OBLIGATORIO)
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: 17
 
-# 🔧 Workloads MAUI + Android
-- name: Install MAUI workloads
-  run: |
-    dotnet workload install maui android
+      # 🔧 Workloads MAUI + Android
+      - name: Install MAUI workloads
+        run: dotnet workload install maui android
 
-# 🧹 Limpieza
-- name: Clean
-  run: dotnet clean POPSManager.sln -c Release
+      # 🧹 Limpieza
+      - name: Clean
+        run: dotnet clean POPSManager.sln -c Release
 
-- name: Restore
-  run: dotnet restore POPSManager.sln
+      - name: Restore
+        run: dotnet restore POPSManager.sln
 
-# 🔐 Keystore
-- name: Decode Keystore
-  run: |
-    $bytes = [System.Convert]::FromBase64String($env:KEYSTORE_BASE64)
-    $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
-    [System.IO.File]::WriteAllBytes($keystorePath, $bytes)
-  shell: pwsh
+      # 🔐 Keystore
+      - name: Decode Keystore
+        shell: pwsh
+        run: |
+          $bytes = [System.Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}")
+          $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
+          [System.IO.File]::WriteAllBytes($keystorePath, $bytes)
 
-# 🔨 Build APK
-- name: Publish APK
-  run: |
-    $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
+      # 🔨 Build APK
+      - name: Publish APK
+        shell: pwsh
+        run: |
+          $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
 
-    dotnet publish POPSManager.Android/POPSManager.Android.csproj `
-      -c Release `
-      -f net8.0-android `
-      -p:RuntimeIdentifier=android-arm64 `
-      -p:AndroidPackageFormat=apk `
-      -p:BuildApk=true `
-      -p:AndroidKeyStore=true `
-      -p:AndroidSigningKeyStore="$keystorePath" `
-      -p:AndroidSigningKeyAlias=$env:KEY_ALIAS `
-      -p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
-      -p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD
-  shell: pwsh
-  env:
-    KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-    KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-    KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          dotnet publish POPSManager.Android/POPSManager.Android.csproj `
+            -c Release `
+            -f net8.0-android `
+            -p:RuntimeIdentifier=android-arm64 `
+            -p:AndroidPackageFormat=apk `
+            -p:BuildApk=true `
+            -p:AndroidKeyStore=true `
+            -p:AndroidSigningKeyStore="$keystorePath" `
+            -p:AndroidSigningKeyAlias="${{ secrets.KEY_ALIAS }}" `
+            -p:AndroidSigningKeyPass="${{ secrets.KEY_PASSWORD }}" `
+            -p:AndroidSigningStorePass="${{ secrets.KEYSTORE_PASSWORD }}"
 
-# 📦 Buscar APK
-- name: Find APK
-  run: |
-    Get-ChildItem -Recurse -Filter *.apk | ForEach-Object {
-      Write-Host "APK encontrado: $($_.FullName)"
-    }
+      # 📦 Buscar APK
+      - name: Find APK
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter *.apk | ForEach-Object {
+            Write-Host "APK encontrado: $($_.FullName)"
+          }
 
-# 📁 Copiar APK
-- name: Copy APK
-  run: |
-    New-Item -ItemType Directory -Force -Path publish
-    $apk = Get-ChildItem -Recurse -Filter *.apk | Select-Object -First 1
-    if ($apk) {
-      Copy-Item $apk.FullName publish\
-    } else {
-      throw "APK no encontrado"
-    }
+      # 📁 Copiar APK
+      - name: Copy APK
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path publish
+          $apk = Get-ChildItem -Recurse -Filter *.apk | Select-Object -First 1
+          if ($apk) {
+            Copy-Item $apk.FullName publish\
+          } else {
+            throw "APK no encontrado"
+          }
 
-# 📦 Artefacto
-- name: Upload Artifact
-  uses: actions/upload-artifact@v4
-  with:
-    name: APK
-    path: publish/**/*.apk
+      # 📦 Artefacto
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: APK
+          path: publish/**/*.apk
 
-# 🚀 Release
-- name: Create Release
-  uses: softprops/action-gh-release@v2
-  with:
-    tag_name: v${{ github.run_number }}
-    name: Build v${{ github.run_number }}
-    files: publish/**/*.apk
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 🚀 Release
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Build v${{ github.run_number }}
+          files: publish/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
