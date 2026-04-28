@@ -1,6 +1,7 @@
 using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using CommunityToolkit.Maui; // 🔥 IMPORTANTE
 using POPSManager.Core.Services;
 using POPSManager.Android.ViewModels;
 using POPSManager.Android.Views;
@@ -14,7 +15,8 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
 
         builder
-            .UseMauiApp<App>();
+            .UseMauiApp<App>()
+            .UseMauiCommunityToolkit(); // ✅ FIX
 
         // 🔹 Servicios
         builder.Services.AddSingleton<IPathsService, PathsService>();
