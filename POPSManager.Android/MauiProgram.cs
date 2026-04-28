@@ -2,7 +2,7 @@ using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Maui;
-using POPSManager.Core.Services;
+using POPSManager.Core.Services;      // Contiene NotificationService, PathsService, etc.
 using POPSManager.Android.ViewModels;
 using POPSManager.Android.Views;
 
@@ -24,13 +24,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<ConverterService>();
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<NotificationService>();
-        builder.Services.AddSingleton<LocalizationService>();   // por si se necesita en otras partes
+        builder.Services.AddSingleton<LocalizationService>();
 
         // 🔹 ViewModels
         builder.Services.AddTransient<HomeViewModel>();
-        // Si tienes ViewModels para ConvertPage y ProcessPopsPage, regístralos aquí
-        // builder.Services.AddTransient<ConvertViewModel>();
-        // builder.Services.AddTransient<ProcessPopsViewModel>();
 
         // 🔹 Páginas (Views)
         builder.Services.AddTransient<HomePage>();
