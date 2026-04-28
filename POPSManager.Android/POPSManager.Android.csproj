@@ -4,40 +4,37 @@
     <!-- 🎯 Target -->
     <TargetFramework>net8.0-android</TargetFramework>
 
-    <!-- 🔧 MAUI -->
+    <!-- MAUI -->
     <UseMaui>true</UseMaui>
 
-    <!-- 🔥 NECESARIO para generar APK -->
+    <!-- 🔥 NECESARIO -->
     <OutputType>Exe</OutputType>
 
     <!-- 📦 Identidad -->
     <ApplicationId>com.raideldev.popsmanager</ApplicationId>
 
-    <!-- 📱 Android mínimo -->
+    <!-- Android -->
     <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <TargetPlatformVersion>34</TargetPlatformVersion>
 
-    <!-- ⚙️ Runtime -->
+    <!-- Runtime -->
     <RuntimeIdentifier>android-arm64</RuntimeIdentifier>
 
-    <!-- 🧠 Calidad -->
+    <!-- Build -->
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- 🚀 IMPORTANTE: evita errores silenciosos en CI -->
-    <AndroidUseLatestPlatformSdk>true</AndroidUseLatestPlatformSdk>
+    <!-- ⚠️ IMPORTANTE: NO DEFINIR AndroidManifest -->
+    <!-- MAUI lo detecta automáticamente en Platforms -->
 
-    <!-- 🔕 Evitar errores por frameworks EOL en SDK nuevos -->
-    <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 📦 MAUI -->
     <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.100" />
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 🔗 Core -->
     <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
   </ItemGroup>
 
