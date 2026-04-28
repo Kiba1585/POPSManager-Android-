@@ -23,22 +23,22 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      # ☕ Java
+      # ☕ Java (necesario para Android)
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'microsoft'
           java-version: '17'
 
-      # 🔥 MAUI
+      # 🔥 Instalar workloads MAUI
       - name: Install MAUI Workloads
         run: dotnet workload restore
 
-      # 🧹 Limpieza REAL (evita bugs raros)
+      # 🧹 Limpieza REAL (PowerShell correcto)
       - name: Delete bin/obj
+        shell: pwsh
         run: |
-          rmdir /s /q **\bin || echo "no bin"
-          rmdir /s /q **\obj || echo "no obj"
+          Get-ChildItem -Path . -Include bin,obj -Recurse -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Clean
         run: dotnet clean POPSManager.sln -c Release
@@ -47,7 +47,7 @@ jobs:
       - name: Restore
         run: dotnet restore POPSManager.sln
 
-      # 🔐 Keystore
+      # 🔐 Decodificar Keystore
       - name: Decode Keystore
         shell: pwsh
         run: |
@@ -55,7 +55,7 @@ jobs:
           $path = Join-Path $env:GITHUB_WORKSPACE "keystore.keystore"
           [IO.File]::WriteAllBytes($path, $bytes)
 
-      # 🔨 Build APK firmado
+      # 🔨 Build APK firmado (SIN AndroidManifest manual ❗)
       - name: Publish APK
         shell: pwsh
         run: |
@@ -88,14 +88,14 @@ jobs:
             throw "❌ No se encontró APK firmado"
           }
 
-      # 📁 Artifact
+      # 📁 Subir artifact
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: popsmanager-apk
           path: publish/*.apk
 
-      # 🚀 Release automático
+      # 🚀 Crear release automático
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
