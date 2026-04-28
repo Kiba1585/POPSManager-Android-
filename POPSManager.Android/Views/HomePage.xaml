@@ -4,8 +4,67 @@
              x:Class="POPSManager.Android.Views.HomePage"
              Title="POPSManager Android">
 
-    <Label Text="Home Page cargada correctamente"
-           VerticalOptions="Center"
-           HorizontalOptions="Center"
-           FontSize="20" />
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+
+            <!-- Rutas de trabajo -->
+            <Frame BackgroundColor="#2D2D2D" Padding="15" CornerRadius="10" BorderColor="Transparent">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Rutas de trabajo" FontSize="18" FontAttributes="Bold" TextColor="White" />
+
+                    <Label Text="Carpeta de origen:" FontSize="14" TextColor="#CCCCCC" />
+                    <Entry Text="{Binding SourcePath}" Placeholder="Ruta de origen" BackgroundColor="#3A3A3A" TextColor="White" />
+                    <Button Text="Seleccionar" Command="{Binding ChangeSourceFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+
+                    <Label Text="Carpeta de destino:" FontSize="14" TextColor="#CCCCCC" />
+                    <Entry Text="{Binding DestinationPath}" Placeholder="Ruta de destino" BackgroundColor="#3A3A3A" TextColor="White" />
+                    <Button Text="Seleccionar" Command="{Binding ChangeDestinationFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+
+                    <Label Text="Carpeta de ELFs:" FontSize="14" TextColor="#CCCCCC" />
+                    <Entry Text="{Binding ElfFolderPath}" Placeholder="Ruta de ELFs" BackgroundColor="#3A3A3A" TextColor="White" />
+                    <Button Text="Seleccionar" Command="{Binding ChangeElfFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+
+                    <HorizontalStackLayout Spacing="10">
+                        <CheckBox IsChecked="{Binding ProcessSubfolders}" Color="White" />
+                        <Label Text="Procesar subcarpetas" VerticalOptions="Center" TextColor="White" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Acciones rápidas -->
+            <Label Text="Acciones rápidas" FontSize="20" FontAttributes="Bold" TextColor="White" />
+            <FlexLayout Wrap="Wrap" JustifyContent="Start">
+                <Button Text="Convertir" Command="{Binding OpenConvertCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+                <Button Text="Procesar" Command="{Binding OpenProcessPopsCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+                <Button Text="Abrir raíz" Command="{Binding OpenRootFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
+                <Button Text="Abrir ELF" Command="{Binding OpenElfFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
+            </FlexLayout>
+
+            <!-- Información del sistema -->
+            <Frame BackgroundColor="#2D2D2D" Padding="15" CornerRadius="10" BorderColor="Transparent">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Información del sistema" FontSize="18" FontAttributes="Bold" TextColor="White" />
+                    <Label Text="{Binding SystemInfo}" FontSize="14" TextColor="#CCCCCC" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Registro de actividad -->
+            <Frame BackgroundColor="#2D2D2D" Padding="15" CornerRadius="10" BorderColor="Transparent">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Registro de actividad" FontSize="18" FontAttributes="Bold" TextColor="White" />
+                    <CollectionView ItemsSource="{Binding LogEntries}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <HorizontalStackLayout Spacing="5">
+                                    <Label Text="{Binding Icon}" FontSize="14" />
+                                    <Label Text="{Binding Message}" FontSize="12" TextColor="{Binding Color}" />
+                                </HorizontalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Frame>
+
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
