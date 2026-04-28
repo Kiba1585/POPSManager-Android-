@@ -1,33 +1,44 @@
-<Project Sdk="Microsoft.NET.Sdk">  <PropertyGroup>
-    <!-- 🎯 Target principal -->
-    <TargetFramework>net8.0-android</TargetFramework><!-- 🔧 MAUI -->
-<UseMaui>true</UseMaui>
+<Project Sdk="Microsoft.NET.Sdk">
 
-<!-- 🔥 CRÍTICO: necesario para generar APK -->
-<OutputType>Exe</OutputType>
+  <PropertyGroup>
+    <!-- 🎯 Target -->
+    <TargetFramework>net8.0-android</TargetFramework>
 
-<!-- 📦 Identidad de la app (OBLIGATORIO para empaquetado) -->
-<ApplicationId>com.raideldev.popsmanager</ApplicationId>
+    <!-- 🔧 MAUI -->
+    <UseMaui>true</UseMaui>
 
-<!-- 📱 Versión mínima Android -->
-<SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <!-- 🔥 NECESARIO para generar APK -->
+    <OutputType>Exe</OutputType>
 
-<!-- ⚙️ Runtime (alineado con publish) -->
-<RuntimeIdentifier>android-arm64</RuntimeIdentifier>
+    <!-- 📦 Identidad -->
+    <ApplicationId>com.raideldev.popsmanager</ApplicationId>
 
-<!-- 🧠 Buenas prácticas -->
-<ImplicitUsings>enable</ImplicitUsings>
-<Nullable>enable</Nullable>
+    <!-- 📱 Android mínimo -->
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
 
-<!-- 📉 Opcional: mejora tamaño APK -->
-<PublishTrimmed>true</PublishTrimmed>
-<TrimMode>link</TrimMode>
+    <!-- ⚙️ Runtime -->
+    <RuntimeIdentifier>android-arm64</RuntimeIdentifier>
 
-  </PropertyGroup>  <ItemGroup>
+    <!-- 🧠 Calidad -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- 🚀 IMPORTANTE: evita errores silenciosos en CI -->
+    <AndroidUseLatestPlatformSdk>true</AndroidUseLatestPlatformSdk>
+
+    <!-- 🔕 Evitar errores por frameworks EOL en SDK nuevos -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
     <!-- 📦 MAUI -->
     <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.100" />
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
-  </ItemGroup>  <ItemGroup>
-    <!-- 🔗 Core compartido -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 🔗 Core -->
     <ProjectReference Include="..\POPSManager.Core\POPSManager.Core.csproj" />
-  </ItemGroup></Project>
+  </ItemGroup>
+
+</Project>
