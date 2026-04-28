@@ -1,40 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.raideldev.popsmanager">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.raideldev.popsmanager">
 
-    <!-- Permisos básicos -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Para acceso a almacenamiento (Android 10+) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="28" />
-
-    <!-- Android 11+ (Scoped Storage / acceso amplio) -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-
-    <application
-        android:allowBackup="true"
-        android:label="POPSManager"
-        android:icon="@mipmap/appicon"
-        android:roundIcon="@mipmap/appicon_round"
-        android:supportsRtl="true"
-        android:usesCleartextTraffic="true">
-
-        <!-- Actividad principal (MAUI la usa internamente) -->
-        <activity
-            android:name="crc64...MainActivity"
-            android:exported="true"
-            android:theme="@style/Maui.SplashTheme">
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-        </activity>
-
-    </application>
+  <application
+      android:allowBackup="true"
+      android:label="POPSManager"
+      android:supportsRtl="true" />
 
 </manifest>
