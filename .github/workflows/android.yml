@@ -17,24 +17,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🔧 .NET (compatible con global.json)
+      # 🔧 .NET
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
-      # ☕ Java (Android lo necesita)
+      # ☕ Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'microsoft'
           java-version: '17'
 
-      # 🔥 MAUI workloads (CRÍTICO)
+      # 🔥 MAUI
       - name: Install MAUI Workloads
         run: dotnet workload restore
 
-      # 🧹 Clean
+      # 🧹 Limpieza REAL (evita bugs raros)
+      - name: Delete bin/obj
+        run: |
+          rmdir /s /q **\bin || echo "no bin"
+          rmdir /s /q **\obj || echo "no obj"
+
       - name: Clean
         run: dotnet clean POPSManager.sln -c Release
 
@@ -66,10 +71,9 @@ jobs:
             -p:AndroidSigningKeyStore="$keystore" `
             -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }} `
             -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }} `
-            -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }} `
-            -p:AndroidManifest=Platforms\Android\AndroidManifest.xml
+            -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
 
-      # 📦 Copiar APK correcto (firmado)
+      # 📦 Copiar APK firmado correcto
       - name: Copy APK
         shell: pwsh
         run: |
