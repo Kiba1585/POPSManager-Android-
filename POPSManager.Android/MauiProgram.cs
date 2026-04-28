@@ -25,8 +25,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<NotificationService>();
 
-        // 🔹 ViewModels (por ahora no se usa)
-        // builder.Services.AddTransient<HomeViewModel>();
+        // 🔹 ViewModels
+        builder.Services.AddTransient<HomeViewModel>();
 
         // 🔹 Páginas
         builder.Services.AddTransient<HomePage>();
