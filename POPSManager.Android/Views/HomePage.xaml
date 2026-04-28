@@ -4,79 +4,8 @@
              x:Class="POPSManager.Android.Views.HomePage"
              Title="POPSManager Android">
 
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="15">
-
-            <!-- ========================================================= -->
-            <!--  RUTAS DE TRABAJO -->
-            <!-- ========================================================= -->
-            <Frame BackgroundColor="{StaticResource CardBackground}" Padding="15" CornerRadius="10" BorderColor="Transparent">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Rutas de trabajo" FontSize="18" FontAttributes="Bold" TextColor="White" />
-
-                    <!-- Carpeta de origen -->
-                    <Label Text="Carpeta de origen (juegos BIN/CUE/ISO):" FontSize="14" TextColor="#CCCCCC" />
-                    <Entry Text="{Binding SourcePath}" Placeholder="Ruta de origen" BackgroundColor="#2D2D2D" TextColor="White" />
-                    <Button Text="Seleccionar carpeta de origen" Command="{Binding ChangeSourceFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
-
-                    <!-- Carpeta de destino -->
-                    <Label Text="Carpeta de destino (raíz OPL):" FontSize="14" TextColor="#CCCCCC" />
-                    <Entry Text="{Binding DestinationPath}" Placeholder="Ruta de destino" BackgroundColor="#2D2D2D" TextColor="White" />
-                    <Button Text="Seleccionar carpeta de destino" Command="{Binding ChangeDestinationFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
-
-                    <!-- Carpeta de ELFs -->
-                    <Label Text="Carpeta de ELFs:" FontSize="14" TextColor="#CCCCCC" />
-                    <Entry Text="{Binding ElfFolderPath}" Placeholder="Ruta de ELFs" BackgroundColor="#2D2D2D" TextColor="White" />
-                    <Button Text="Seleccionar carpeta de ELFs" Command="{Binding ChangeElfFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
-
-                    <!-- Procesar subcarpetas -->
-                    <HorizontalStackLayout Spacing="10">
-                        <CheckBox IsChecked="{Binding ProcessSubfolders}" Color="White" />
-                        <Label Text="Procesar subcarpetas recursivamente" VerticalOptions="Center" TextColor="White" />
-                    </HorizontalStackLayout>
-                </VerticalStackLayout>
-            </Frame>
-
-            <!-- ========================================================= -->
-            <!--  ACCIONES RÁPIDAS -->
-            <!-- ========================================================= -->
-            <Label Text="Acciones rápidas" FontSize="20" FontAttributes="Bold" TextColor="White" />
-            <FlexLayout Wrap="Wrap" JustifyContent="Start" AlignItems="Center">
-                <Button Text="Convertir juegos" Command="{Binding OpenConvertCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
-                <Button Text="Procesar juegos" Command="{Binding OpenProcessPopsCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
-                <Button Text="Abrir carpeta raíz" Command="{Binding OpenRootFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
-                <Button Text="Abrir ELF" Command="{Binding OpenElfFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
-            </FlexLayout>
-
-            <!-- ========================================================= -->
-            <!--  INFORMACIÓN DEL SISTEMA -->
-            <!-- ========================================================= -->
-            <Frame BackgroundColor="{StaticResource CardBackground}" Padding="15" CornerRadius="10" BorderColor="Transparent">
-                <VerticalStackLayout Spacing="5">
-                    <Label Text="Información del sistema" FontSize="18" FontAttributes="Bold" TextColor="White" />
-                    <Label Text="{Binding SystemInfo}" FontSize="14" TextColor="#CCCCCC" />
-                </VerticalStackLayout>
-            </Frame>
-
-            <!-- ========================================================= -->
-            <!--  REGISTRO DE ACTIVIDAD -->
-            <!-- ========================================================= -->
-            <Frame BackgroundColor="{StaticResource CardBackground}" Padding="15" CornerRadius="10" BorderColor="Transparent">
-                <VerticalStackLayout Spacing="5">
-                    <Label Text="Registro de actividad" FontSize="18" FontAttributes="Bold" TextColor="White" />
-                    <CollectionView ItemsSource="{Binding LogEntries}">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate>
-                                <HorizontalStackLayout Spacing="5">
-                                    <Label Text="{Binding Icon}" FontSize="14" />
-                                    <Label Text="{Binding Message}" FontSize="12" TextColor="{Binding Color}" />
-                                </HorizontalStackLayout>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </VerticalStackLayout>
-            </Frame>
-
-        </VerticalStackLayout>
-    </ScrollView>
+    <Label Text="Home Page cargada correctamente"
+           VerticalOptions="Center"
+           HorizontalOptions="Center"
+           FontSize="20" />
 </ContentPage>
