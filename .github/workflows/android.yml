@@ -14,34 +14,37 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 📥 Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🔧 .NET
-      - name: Setup .NET 8
+      # 🔥 Forzar .NET 8 (evita .NET 10)
+      - name: Setup .NET 8 (LTS)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 8.0.100
 
-      # 🔧 Java (OBLIGATORIO)
+      # ☕ Java requerido por Android
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: microsoft
           java-version: 17
 
-      # 🔧 Workloads MAUI + Android
-      - name: Install MAUI workloads
-        run: dotnet workload install maui android
+      # ⚙️ Instalar workloads MAUI
+      - name: Install MAUI + Android workloads
+        run: |
+          dotnet workload install maui android
 
-      # 🧹 Limpieza
+      # 🧹 Limpieza total
       - name: Clean
         run: dotnet clean POPSManager.sln -c Release
 
+      # 📦 Restaurar
       - name: Restore
         run: dotnet restore POPSManager.sln
 
-      # 🔐 Keystore
+      # 🔐 Decodificar keystore
       - name: Decode Keystore
         shell: pwsh
         run: |
@@ -49,7 +52,7 @@ jobs:
           $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
           [System.IO.File]::WriteAllBytes($keystorePath, $bytes)
 
-      # 🔨 Build APK
+      # 🔨 Publicar APK firmado
       - name: Publish APK
         shell: pwsh
         run: |
@@ -67,10 +70,11 @@ jobs:
             -p:AndroidSigningKeyPass="${{ secrets.KEY_PASSWORD }}" `
             -p:AndroidSigningStorePass="${{ secrets.KEYSTORE_PASSWORD }}"
 
-      # 📦 Buscar APK
+      # 🔍 Ver APK generado
       - name: Find APK
         shell: pwsh
         run: |
+          Write-Host "Buscando APK..."
           Get-ChildItem -Recurse -Filter *.apk | ForEach-Object {
             Write-Host "APK encontrado: $($_.FullName)"
           }
@@ -81,25 +85,27 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path publish
           $apk = Get-ChildItem -Recurse -Filter *.apk | Select-Object -First 1
+
           if ($apk) {
             Copy-Item $apk.FullName publish\
+            Write-Host "APK copiado correctamente"
           } else {
-            throw "APK no encontrado"
+            throw "❌ APK no encontrado"
           }
 
-      # 📦 Artefacto
+      # 📦 Subir artefacto
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: APK
+          name: POPSManager-Android-APK
           path: publish/**/*.apk
 
-      # 🚀 Release
+      # 🚀 Crear Release automático
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: Build v${{ github.run_number }}
+          name: "Build Android v${{ github.run_number }}"
           files: publish/**/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
