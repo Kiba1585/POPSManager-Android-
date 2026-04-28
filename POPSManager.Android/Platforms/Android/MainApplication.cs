@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Runtime;
+using Android.App;
 using System;
 
 namespace POPSManager.Android;
@@ -20,14 +21,17 @@ public class MainApplication : MauiApplication
         }
         catch (Exception ex)
         {
-            // Log del error
             System.Diagnostics.Debug.WriteLine("Error en MainApplication.OnCreate: " + ex.ToString());
-            // Opcional: mostrar un diálogo nativo
-            new AlertDialog.Builder(this)
-                .SetTitle("Error")
-                .SetMessage(ex.Message)
-                .SetPositiveButton("OK", (sender, args) => { })
-                .Show();
+            // Mostrar un diálogo nativo si es necesario
+            try
+            {
+                new AlertDialog.Builder(this)
+                    .SetTitle("Error")
+                    .SetMessage(ex.Message)
+                    .SetPositiveButton("OK", (sender, args) => { })
+                    .Show();
+            }
+            catch { /* evitar crash si el contexto no permite diálogos */ }
         }
     }
 
