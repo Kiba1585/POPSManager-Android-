@@ -2,7 +2,7 @@ using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Maui;
-using POPSManager.Core.Services;      // Contiene NotificationService, PathsService, etc.
+using POPSManager.Core.Services;
 using POPSManager.Android.ViewModels;
 using POPSManager.Android.Views;
 
@@ -24,7 +24,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ConverterService>();
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<NotificationService>();
-        builder.Services.AddSingleton<LocalizationService>();
+        // LocalizationService no está disponible en Core; lo omitimos.
 
         // 🔹 ViewModels
         builder.Services.AddTransient<HomeViewModel>();
