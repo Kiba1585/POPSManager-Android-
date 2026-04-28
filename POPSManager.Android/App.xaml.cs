@@ -9,27 +9,27 @@ public partial class App : Application
         try
         {
             InitializeComponent();
+            MainPage = new AppShell();
 
-            // Página de prueba ultra simple
-            MainPage = new ContentPage
+            notifyService.OnShowToast = (msg, type) =>
             {
-                Content = new Label
+                MainThread.BeginInvokeOnMainThread(() =>
                 {
-                    Text = "POPSManager funcionando",
-                    VerticalOptions = LayoutOptions.Center,
-                    HorizontalOptions = LayoutOptions.Center,
-                    FontSize = 24
-                }
+                    MainPage?.DisplayAlert("POPSManager", msg, "OK");
+                });
             };
         }
         catch (Exception ex)
         {
-            // Si falla hasta esto, mostramos un error en un diálogo nativo
-            MainPage = new ContentPage();
-            MainThread.BeginInvokeOnMainThread(async () =>
+            MainPage = new ContentPage
             {
-                await MainPage.DisplayAlert("Error crítico", ex.ToString(), "OK");
-            });
+                Content = new Label
+                {
+                    Text = $"Error al iniciar: {ex.Message}",
+                    VerticalOptions = LayoutOptions.Center,
+                    HorizontalOptions = LayoutOptions.Center
+                }
+            };
         }
     }
 }
