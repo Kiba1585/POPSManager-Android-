@@ -1,7 +1,4 @@
-name: Build Android (MAUI)
-
-permissions:
-  contents: write
+name: Build Android APK
 
 on:
   push:
@@ -9,61 +6,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-android:
+  build:
     runs-on: windows-latest
 
     steps:
-    # 📥 Checkout
-    - name: Checkout
+    # 1. Checkout
+    - name: Checkout repo
       uses: actions/checkout@v4
 
-    # 🧹 LIMPIEZA TOTAL (evita bugs de cache)
-    - name: Clean repo (hard)
-      run: |
-        git clean -fdx
-
-    # 🔧 .NET 8 (FORZADO, evita .NET 10)
-    - name: Setup .NET 8
+    # 2. Setup .NET
+    - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.100
+        dotnet-version: 8.0.x
 
-    # ☕ Java 17 (necesario para Android)
+    # 3. Setup Java (necesario para Android)
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'microsoft'
         java-version: '17'
 
-    # 📦 MAUI + Android
-    - name: Install MAUI workloads
-      run: |
-        dotnet workload install maui android
-
-    # 🧼 Limpiar NuGet
-    - name: Clear NuGet cache
-      run: dotnet nuget locals all --clear
-
-    # 🔄 Restore
+    # 4. Restaurar dependencias
     - name: Restore
       run: dotnet restore POPSManager.sln
 
-    # 🔐 Decodificar Keystore
+    # 5. Crear keystore desde secret (BASE64)
     - name: Decode Keystore
-      shell: pwsh
       run: |
-        $bytes = [System.Convert]::FromBase64String($env:KEYSTORE_BASE64)
-        $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
-        [System.IO.File]::WriteAllBytes($keystorePath, $bytes)
-      env:
-        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        echo "${{ secrets.KEYSTORE_BASE64 }}" > keystore.txt
+        certutil -decode keystore.txt pops.keystore
 
-    # 🔨 BUILD APK (CLAVE)
-    - name: Publish APK
-      shell: pwsh
+    # 6. Compilar + firmar APK
+    - name: Build APK
       run: |
-        $keystorePath = Join-Path $env:GITHUB_WORKSPACE "popsmanager.keystore"
-
         dotnet publish POPSManager.Android/POPSManager.Android.csproj `
           -c Release `
           -f net8.0-android `
@@ -71,53 +47,38 @@ jobs:
           -p:AndroidPackageFormat=apk `
           -p:BuildApk=true `
           -p:AndroidKeyStore=true `
-          -p:AndroidSigningKeyStore="$keystorePath" `
-          -p:AndroidSigningKeyAlias=$env:KEY_ALIAS `
-          -p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
-          -p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD `
+          -p:AndroidSigningKeyStore="pops.keystore" `
+          -p:AndroidSigningKeyAlias="${{ secrets.KEY_ALIAS }}" `
+          -p:AndroidSigningKeyPass="${{ secrets.KEY_PASSWORD }}" `
+          -p:AndroidSigningStorePass="${{ secrets.KEYSTORE_PASSWORD }}" `
           -p:AndroidManifest=Platforms\Android\AndroidManifest.xml
 
-      env:
-        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-
-    # 🔍 Buscar APK
-    - name: Find APK
-      shell: pwsh
+    # 7. Buscar APK firmado correctamente
+    - name: Locate signed APK
+      id: find_apk
       run: |
-        Write-Host "Buscando APK..."
-        Get-ChildItem -Recurse -Filter *.apk | ForEach-Object {
-          Write-Host "APK encontrado: $($_.FullName)"
+        $apk = Get-ChildItem -Recurse -Filter *-Signed.apk | Select-Object -First 1
+
+        if (-not $apk) {
+          throw "❌ No se encontró APK firmado"
         }
 
-    # 📁 Copiar APK
-    - name: Copy APK
-      shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Force -Path publish
-        $apk = Get-ChildItem -Recurse -Filter *.apk | Select-Object -First 1
+        echo "APK_PATH=$($apk.FullName)" >> $env:GITHUB_ENV
+        echo "APK_NAME=$($apk.Name)" >> $env:GITHUB_ENV
 
-        if ($apk) {
-          Copy-Item $apk.FullName publish\
-          Write-Host "APK copiado: $($apk.FullName)"
-        } else {
-          throw "❌ APK no encontrado"
-        }
-
-    # 📦 Subir artefacto
+    # 8. Subir artifact
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: POPSManager-APK
-        path: publish/**/*.apk
+        name: APK
+        path: ${{ env.APK_PATH }}
 
-    # 🚀 Crear Release
+    # 9. Crear Release automático
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v${{ github.run_number }}
-        name: "Build v${{ github.run_number }}"
-        files: publish/**/*.apk
+        tag_name: v1.${{ github.run_number }}
+        name: Release v1.${{ github.run_number }}
+        files: ${{ env.APK_PATH }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
