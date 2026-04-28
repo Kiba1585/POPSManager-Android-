@@ -18,21 +18,18 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .UseMauiCommunityToolkit();
 
-        // 🔹 Servicios del Core (interfaces + implementaciones)
+        // 🔹 Servicios del Core
         builder.Services.AddSingleton<IPathsService, PathsService>();
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
         builder.Services.AddSingleton<ConverterService>();
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<NotificationService>();
-        // LocalizationService no está disponible en Core; lo omitimos.
 
         // 🔹 ViewModels
         builder.Services.AddTransient<HomeViewModel>();
 
-        // 🔹 Páginas (Views)
+        // 🔹 Páginas (solo la implementada)
         builder.Services.AddTransient<HomePage>();
-        builder.Services.AddTransient<ConvertPage>();
-        builder.Services.AddTransient<ProcessPopsPage>();
 
         // 🔹 AppShell
         builder.Services.AddTransient<AppShell>();
