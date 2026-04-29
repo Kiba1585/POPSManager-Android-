@@ -3,6 +3,10 @@ using Microsoft.Maui.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Maui;
 using POPSManager.Core.Services;
+using POPSManager.Core.Logic.Automation;
+using POPSManager.Core.Logic.Cheats;
+using POPSManager.Core.Localization;
+using POPSManager.Core.Settings;
 using POPSManager.Android.ViewModels;
 using POPSManager.Android.Views;
 
@@ -24,10 +28,16 @@ public static class MauiProgram
         builder.Services.AddSingleton<ConverterService>();
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<NotificationService>();
+        builder.Services.AddSingleton<LocalizationService>();
+        builder.Services.AddSingleton<CheatSettingsService>();
+        builder.Services.AddSingleton<CheatManagerService>();
+        builder.Services.AddSingleton<AutomationEngine>();
+        builder.Services.AddSingleton<GameProcessor>();
 
         // 🔹 ViewModels
         builder.Services.AddTransient<HomeViewModel>();
         builder.Services.AddTransient<ConvertViewModel>();
+        builder.Services.AddTransient<ProcessPopsViewModel>();
 
         // 🔹 Páginas
         builder.Services.AddTransient<HomePage>();
