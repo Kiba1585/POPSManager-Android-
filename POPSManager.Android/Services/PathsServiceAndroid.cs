@@ -66,8 +66,11 @@ public class PathsServiceAndroid : IPathsService
 
         try
         {
-            // Usar el nombre completo para evitar conflicto con la clase App de MAUI
             var context = global::Android.App.Application.Context;
+            var packageManager = context.PackageManager;
+            if (packageManager is null)
+                return;
+
             var androidUri = AndroidX.Core.Content.FileProvider.GetUriForFile(
                 context,
                 context.PackageName + ".fileprovider",
@@ -78,7 +81,7 @@ public class PathsServiceAndroid : IPathsService
             intent.AddFlags(ActivityFlags.GrantReadUriPermission);
             intent.AddFlags(ActivityFlags.NewTask);
 
-            if (intent.ResolveActivity(context.PackageManager) == null)
+            if (intent.ResolveActivity(packageManager) == null)
             {
                 var docUri = AndroidUri.Parse(
                     "content://com.android.externalstorage.documents/tree/" +
