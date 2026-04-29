@@ -17,6 +17,7 @@ public class ConvertViewModel : BindableObject
     private readonly IPathsService _paths;
     private readonly ConverterService _converter;
     private readonly ILoggingService _log;
+    private readonly SettingsService _settings;
 
     private string _sourceFolder = "";
     private string _destFolder = "";
@@ -46,11 +47,16 @@ public class ConvertViewModel : BindableObject
         set { if (_status != value) { _status = value; OnPropertyChanged(); } }
     }
 
-    public ConvertViewModel(IPathsService paths, ConverterService converter, ILoggingService log)
+    public ConvertViewModel(IPathsService paths, ConverterService converter, ILoggingService log, SettingsService settings)
     {
         _paths = paths;
         _converter = converter;
         _log = log;
+        _settings = settings;
+
+        // Recuperar rutas guardadas (las mismas que usa HomePage)
+        SourceFolder = _settings.SourceFolder ?? "";
+        DestFolder = _settings.DestinationFolder ?? "";
 
         SelectSourceCommand = new Command(async () => await SafeExecute(SelectSource));
         SelectDestCommand = new Command(async () => await SafeExecute(SelectDest));
@@ -61,13 +67,23 @@ public class ConvertViewModel : BindableObject
     private async Task SelectSource()
     {
         var path = await _paths.SelectFolderAsync();
-        if (path != null) SourceFolder = path;
+        if (path != null)
+        {
+            SourceFolder = path;
+            _settings.SourceFolder = path;
+            await _settings.SaveAsync();
+        }
     }
 
     private async Task SelectDest()
     {
         var path = await _paths.SelectFolderAsync();
-        if (path != null) DestFolder = path;
+        if (path != null)
+        {
+            DestFolder = path;
+            _settings.DestinationFolder = path;
+            await _settings.SaveAsync();
+        }
     }
 
     private void LoadFiles()
@@ -105,12 +121,10 @@ public class ConvertViewModel : BindableObject
 
     private bool TienePermisoAllFiles()
     {
-#if ANDROID
-        if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R)
+        if (global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.R)
         {
-            return Android.OS.Environment.IsExternalStorageManager;
+            return global::Android.OS.Environment.IsExternalStorageManager;
         }
-#endif
         return true;
     }
 
@@ -125,11 +139,9 @@ public class ConvertViewModel : BindableObject
         // Verificar si tenemos permiso total de acceso a archivos
         if (!TienePermisoAllFiles())
         {
-#if ANDROID
             Status = "Se necesita permiso 'Todos los archivos'. Actívalo en Ajustes > Aplicaciones > POPSManager.";
-            var intent = new Android.Content.Intent(Android.Provider.Settings.ActionManageAllFilesAccessPermission);
-            Android.App.Application.Context.StartActivity(intent);
-#endif
+            var intent = new global::Android.Content.Intent(global::Android.Provider.Settings.ActionManageAllFilesAccessPermission);
+            global::Android.App.Application.Context.StartActivity(intent);
             return;
         }
 
@@ -148,7 +160,6 @@ public class ConvertViewModel : BindableObject
 
         if (!puedeEscribir)
         {
-            // Fallback a carpeta interna
             finalDest = Path.Combine(FileSystem.AppDataDirectory, "Converted");
             Status = "No se pudo escribir en la carpeta seleccionada. Se usará almacenamiento interno.";
         }
@@ -181,14 +192,12 @@ public class ConvertViewModel : BindableObject
 
         try
         {
-#if ANDROID
-            var context = Android.App.Application.Context;
-            var intent = new Android.Content.Intent(Android.Content.Intent.ActionView);
-            var uri = Android.Net.Uri.Parse(_actualOutputFolder);
+            var context = global::Android.App.Application.Context;
+            var intent = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView);
+            var uri = global::Android.Net.Uri.Parse(_actualOutputFolder);
             intent.SetDataAndType(uri, "resource/folder");
-            intent.AddFlags(Android.Content.ActivityFlags.NewTask);
+            intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
             context.StartActivity(intent);
-#endif
         }
         catch (Exception ex)
         {
