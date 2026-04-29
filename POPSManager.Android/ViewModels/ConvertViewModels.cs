@@ -1,9 +1,11 @@
+using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Services;
+using POPSManager.Android.Services;   // para el cast a PathsServiceAndroid
 
 namespace POPSManager.Android.ViewModels;
 
@@ -79,7 +81,6 @@ public class ConvertViewModel : BindableObject
 
         try
         {
-            // Mostrar solo archivos .bin (imágenes de disco) y también .iso si quieres, pero cuidado con .iso
             var files = Directory.GetFiles(SourceFolder, "*.*")
                 .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
                             f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
@@ -111,20 +112,23 @@ public class ConvertViewModel : BindableObject
             return;
         }
 
-        // Determinar carpeta de salida efectiva
         string outputFolder = DestFolder;
-        if (!_paths.IsFolderWritable(DestFolder))
+
+        // Verificar si la implementación concreta ofrece los métodos extra
+        if (_paths is PathsServiceAndroid androidPaths)
         {
-            // Usar la carpeta segura interna
-            outputFolder = _paths.SafeOutputFolder;
-            Status = "Destino no escribible, se usará carpeta interna.";
+            if (!androidPaths.IsFolderWritable(DestFolder))
+            {
+                outputFolder = androidPaths.SafeOutputFolder;
+                Status = "Destino no escribible, se usará carpeta interna.";
+            }
         }
         else
         {
-            Status = "Convirtiendo...";
+            // Si no es la versión Android, confiamos en que la carpeta sea válida
         }
 
-        _actualOutputFolder = outputFolder; // guardar para abrir después
+        _actualOutputFolder = outputFolder;
 
         try
         {
@@ -139,10 +143,14 @@ public class ConvertViewModel : BindableObject
 
     private void OpenOutputFolder()
     {
-        if (!string.IsNullOrEmpty(_actualOutputFolder))
-            _paths.OpenFolder(_actualOutputFolder);
+        if (!string.IsNullOrEmpty(_actualOutputFolder) && _paths is PathsServiceAndroid androidPaths)
+        {
+            androidPaths.OpenFolder(_actualOutputFolder);
+        }
         else
-            Status = "Primero realiza una conversión.";
+        {
+            Status = "No se puede abrir la carpeta (solo en Android).";
+        }
     }
 
     private async Task SafeExecute(Func<Task> action)
