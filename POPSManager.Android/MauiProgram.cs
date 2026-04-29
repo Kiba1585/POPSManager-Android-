@@ -50,8 +50,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<CheatSettingsService>();
         builder.Services.AddSingleton<CheatManagerService>();
 
-        // GameProcessor y sus posibles dependencias adicionales
-        builder.Services.AddSingleton<MultiDiscManager>();
+        // GameProcessor
         builder.Services.AddSingleton<GameProcessor>();
 
         // 🔹 ViewModels
