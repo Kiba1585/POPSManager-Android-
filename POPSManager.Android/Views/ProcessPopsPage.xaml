@@ -4,21 +4,9 @@
              x:Class="POPSManager.Android.Views.ProcessPopsPage"
              Title="Procesar POPS">
 
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="15">
-
-            <Button Text="Seleccionar carpeta de origen" Command="{Binding SelectFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
-            <Button Text="Procesar juegos" Command="{Binding ProcessCommand}" BackgroundColor="#2FA0D8" TextColor="White" IsEnabled="{Binding CanProcess}" />
-
-            <Label Text="{Binding Status}" FontSize="14" TextColor="#CCCCCC" />
-
-            <Label Text="PS1 Games" FontSize="18" FontAttributes="Bold" TextColor="White" />
-            <CollectionView ItemsSource="{Binding Ps1Games}" />
-            <Label Text="PS2 Games" FontSize="18" FontAttributes="Bold" TextColor="White" />
-            <CollectionView ItemsSource="{Binding Ps2Games}" />
-            <Label Text="APPs" FontSize="18" FontAttributes="Bold" TextColor="White" />
-            <CollectionView ItemsSource="{Binding AppsGames}" />
-
-        </VerticalStackLayout>
-    </ScrollView>
+    <Label Text="Funcionalidad próximamente"
+           VerticalOptions="Center"
+           HorizontalOptions="Center"
+           FontSize="18"
+           TextColor="White" />
 </ContentPage>
