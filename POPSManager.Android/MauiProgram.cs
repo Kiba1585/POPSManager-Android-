@@ -23,26 +23,35 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .UseMauiCommunityToolkit();
 
-        // 🔹 Servicios del Core
+        // 🔹 Servicios del Core – interfaces y clases concretas
 
-        // Interfaces → implementación Android
+        // Paths y Logging
         builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
-
-        // Clases concretas que esperan algunos constructores (como GameProcessor)
         builder.Services.AddSingleton<LoggingService>();
+
+        // PathsService concreto por si alguna clase lo requiere directamente
         builder.Services.AddSingleton<PathsService>();
 
-        // ConverterService sin delegados no registrados
+        // ConverterService sin delegados
         builder.Services.AddSingleton<ConverterService>(sp =>
             new ConverterService(null, null));
 
-        builder.Services.AddSingleton<SettingsService>();
+        // Notification, Settings, Localization
         builder.Services.AddSingleton<NotificationService>();
+        builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<LocalizationService>();
+
+        // Automation y sus dependencias
+        builder.Services.AddSingleton<AutomationSettings>();
+        builder.Services.AddSingleton<AutomationEngine>();
+
+        // Cheats
         builder.Services.AddSingleton<CheatSettingsService>();
         builder.Services.AddSingleton<CheatManagerService>();
-        builder.Services.AddSingleton<AutomationEngine>();
+
+        // GameProcessor y sus posibles dependencias adicionales
+        builder.Services.AddSingleton<MultiDiscManager>();
         builder.Services.AddSingleton<GameProcessor>();
 
         // 🔹 ViewModels
