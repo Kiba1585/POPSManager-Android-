@@ -59,10 +59,6 @@ public class PathsServiceAndroid : IPathsService
         }
     }
 
-    /// <summary>
-    /// Abre una carpeta con un explorador de archivos.
-    /// Requiere FileProvider configurado en AndroidManifest.
-    /// </summary>
     public void OpenFolder(string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
@@ -70,7 +66,8 @@ public class PathsServiceAndroid : IPathsService
 
         try
         {
-            var context = Android.App.Application.Context;
+            // Usar el nombre completo para evitar conflicto con la clase App de MAUI
+            var context = global::Android.App.Application.Context;
             var androidUri = AndroidX.Core.Content.FileProvider.GetUriForFile(
                 context,
                 context.PackageName + ".fileprovider",
