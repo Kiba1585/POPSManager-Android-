@@ -1,101 +1,134 @@
-using System;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows.Input;
+using POPSManager.Core.Services;
 
-namespace POPSManager.Core.Services;
+namespace POPSManager.Android.ViewModels;
 
-public class ConverterService
+public class FileItem
 {
-    private readonly Action<string>? _log;
-    private readonly Action<string>? _setStatus;
+    public string Name { get; set; } = "";
+    public string Icon { get; set; } = "";
+}
 
-    private const int SectorSize = 2352;
-    private const int UserDataSize = 2048;
-    private const int HeaderSize = 0x800;
-    private const int BufferSize = 1024 * 1024;
+public class ConvertViewModel : BindableObject
+{
+    private readonly IPathsService _paths;
+    private readonly ConverterService _converter;
+    private readonly ILoggingService _log;
 
-    public ConverterService(Action<string>? log = null, Action<string>? setStatus = null)
+    private string _sourceFolder = "";
+    private string _destFolder = "";
+    private string _status = "";
+
+    public ObservableCollection<FileItem> Files { get; } = new();
+
+    public ICommand SelectSourceCommand { get; }
+    public ICommand SelectDestCommand { get; }
+    public ICommand ConvertCommand { get; }
+
+    public string SourceFolder
     {
+        get => _sourceFolder;
+        set { if (_sourceFolder != value) { _sourceFolder = value; OnPropertyChanged(); LoadFiles(); } }
+    }
+    public string DestFolder
+    {
+        get => _destFolder;
+        set { if (_destFolder != value) { _destFolder = value; OnPropertyChanged(); } }
+    }
+    public string Status
+    {
+        get => _status;
+        set { if (_status != value) { _status = value; OnPropertyChanged(); } }
+    }
+
+    public ConvertViewModel(IPathsService paths, ConverterService converter, ILoggingService log)
+    {
+        _paths = paths;
+        _converter = converter;
         _log = log;
-        _setStatus = setStatus;
+
+        SelectSourceCommand = new Command(async () => await SafeExecute(SelectSource));
+        SelectDestCommand = new Command(async () => await SafeExecute(SelectDest));
+        ConvertCommand = new Command(async () => await SafeExecute(ConvertFiles));
     }
 
-    public async Task ConvertFolderAsync(string sourceFolder, string outputFolder)
+    private async Task SelectSource()
     {
-        if (!Directory.Exists(sourceFolder))
-            throw new DirectoryNotFoundException($"Origen no encontrado: {sourceFolder}");
+        var path = await _paths.SelectFolderAsync();
+        if (path != null) SourceFolder = path;
+    }
 
-        Directory.CreateDirectory(outputFolder);
+    private async Task SelectDest()
+    {
+        var path = await _paths.SelectFolderAsync();
+        if (path != null) DestFolder = path;
+    }
 
-        var files = Directory.GetFiles(sourceFolder, "*.*")
-            .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(f => f)
-            .ToArray();
+    private void LoadFiles()
+    {
+        Files.Clear();
+        if (string.IsNullOrEmpty(SourceFolder) || !Directory.Exists(SourceFolder))
+            return;
 
-        foreach (var file in files)
+        try
         {
-            try
-            {
-                await ConvertToVcdAsync(file, outputFolder);
-            }
-            catch (Exception ex)
-            {
-                _log?.Invoke($"ERROR convirtiendo {file}: {ex.Message}");
-            }
+            var files = Directory.GetFiles(SourceFolder, "*.*")
+                .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+                .Select(f => new FileItem
+                {
+                    Name = Path.GetFileName(f),
+                    Icon = Path.GetExtension(f).ToLowerInvariant() switch
+                    {
+                        ".bin" => "💾",
+                        ".cue" => "📄",
+                        ".iso" => "💿",
+                        _ => "📁"
+                    }
+                })
+                .ToList();
+
+            foreach (var f in files) Files.Add(f);
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error al listar archivos: {ex.Message}";
         }
     }
 
-    private async Task ConvertToVcdAsync(string inputPath, string outputFolder)
+    private async Task ConvertFiles()
     {
-        string name = Path.GetFileNameWithoutExtension(inputPath);
-        string outputPath = Path.Combine(outputFolder, name + ".vcd");
-
-        await ConvertPs1ToVcdAsync(inputPath, outputPath, name);
-    }
-
-    private async Task ConvertPs1ToVcdAsync(string inputPath, string outputPath, string name)
-    {
-        await using var input = File.OpenRead(inputPath);
-        await using var output = File.Create(outputPath);
-
-        byte[] header = new byte[HeaderSize];
-        Array.Copy(Encoding.ASCII.GetBytes("PSX"), header, 3);
-        await output.WriteAsync(header, 0, header.Length);
-
-        byte[] sector = new byte[SectorSize];
-        byte[] outputBuffer = new byte[BufferSize];
-        int bufferPos = 0;
-        long totalSectors = input.Length / SectorSize;
-        long processed = 0;
-
-        while (true)
+        if (string.IsNullOrEmpty(SourceFolder) || string.IsNullOrEmpty(DestFolder))
         {
-            int read = await input.ReadAsync(sector, 0, SectorSize);
-            if (read == 0) break;
-            if (read != SectorSize) break;
-
-            if (bufferPos + UserDataSize > outputBuffer.Length)
-            {
-                await output.WriteAsync(outputBuffer, 0, bufferPos);
-                bufferPos = 0;
-            }
-
-            Buffer.BlockCopy(sector, 24, outputBuffer, bufferPos, UserDataSize);
-            bufferPos += UserDataSize;
-            processed++;
-
-            if (processed % 200 == 0)
-            {
-                int percent = (int)((processed / (double)totalSectors) * 100);
-                _setStatus?.Invoke($"Convirtiendo {name}: {percent}%");
-            }
+            Status = "Selecciona origen y destino primero.";
+            return;
         }
 
-        if (bufferPos > 0)
-            await output.WriteAsync(outputBuffer, 0, bufferPos);
+        Status = "Convirtiendo...";
+        try
+        {
+            await _converter.ConvertFolderAsync(SourceFolder, DestFolder);
+            Status = "Conversión completada.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task SafeExecute(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error: {ex.Message}";
+        }
     }
 }
