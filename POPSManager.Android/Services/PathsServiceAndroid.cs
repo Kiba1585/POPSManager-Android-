@@ -2,6 +2,7 @@ using Android.Content;
 using AndroidX.Core.Content;
 using CommunityToolkit.Maui.Storage;
 using POPSManager.Core.Services;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using AndroidUri = Android.Net.Uri;
@@ -58,6 +59,10 @@ public class PathsServiceAndroid : IPathsService
         }
     }
 
+    /// <summary>
+    /// Abre una carpeta con un explorador de archivos.
+    /// Requiere FileProvider configurado en AndroidManifest.
+    /// </summary>
     public void OpenFolder(string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
@@ -66,20 +71,22 @@ public class PathsServiceAndroid : IPathsService
         try
         {
             var context = Android.App.Application.Context;
-            var uri = FileProvider.GetUriForFile(context,
+            var androidUri = AndroidX.Core.Content.FileProvider.GetUriForFile(
+                context,
                 context.PackageName + ".fileprovider",
                 new Java.IO.File(folderPath));
 
             var intent = new Intent(Intent.ActionView);
-            intent.SetDataAndType(uri, "resource/folder");
+            intent.SetDataAndType(androidUri, "resource/folder");
             intent.AddFlags(ActivityFlags.GrantReadUriPermission);
             intent.AddFlags(ActivityFlags.NewTask);
 
             if (intent.ResolveActivity(context.PackageManager) == null)
             {
-                var docUri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/" +
+                var docUri = AndroidUri.Parse(
+                    "content://com.android.externalstorage.documents/tree/" +
                     folderPath.Replace("/storage/emulated/0/", "primary%3A"));
-                intent.SetDataAndType(docUri, DocumentsContract.Document.MimeTypeDir);
+                intent.SetDataAndType(docUri, "resource/folder");
             }
 
             context.StartActivity(intent);
