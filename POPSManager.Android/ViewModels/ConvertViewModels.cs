@@ -21,12 +21,14 @@ public class ConvertViewModel : BindableObject
     private string _sourceFolder = "";
     private string _destFolder = "";
     private string _status = "";
+    private string _actualOutputFolder = "";
 
     public ObservableCollection<FileItem> Files { get; } = new();
 
     public ICommand SelectSourceCommand { get; }
     public ICommand SelectDestCommand { get; }
     public ICommand ConvertCommand { get; }
+    public ICommand OpenOutputFolderCommand { get; }
 
     public string SourceFolder
     {
@@ -53,6 +55,7 @@ public class ConvertViewModel : BindableObject
         SelectSourceCommand = new Command(async () => await SafeExecute(SelectSource));
         SelectDestCommand = new Command(async () => await SafeExecute(SelectDest));
         ConvertCommand = new Command(async () => await SafeExecute(ConvertFiles));
+        OpenOutputFolderCommand = new Command(OpenOutputFolder);
     }
 
     private async Task SelectSource()
@@ -101,40 +104,70 @@ public class ConvertViewModel : BindableObject
     }
 
     private async Task ConvertFiles()
-{
-    if (string.IsNullOrEmpty(SourceFolder) || string.IsNullOrEmpty(DestFolder))
     {
-        Status = "Selecciona origen y destino primero.";
-        return;
+        if (string.IsNullOrEmpty(SourceFolder) || string.IsNullOrEmpty(DestFolder))
+        {
+            Status = "Selecciona origen y destino primero.";
+            return;
+        }
+
+        string finalDest = DestFolder;
+
+        // Verificar si la carpeta destino es escribible
+        if (_paths is Services.PathsServiceAndroid androidPaths && androidPaths.IsFolderWritable(DestFolder))
+        {
+            // Se puede escribir directamente
+        }
+        else
+        {
+            // Usar carpeta interna segura
+            finalDest = (_paths as Services.PathsServiceAndroid)?.SafeOutputFolder ?? Path.Combine(FileSystem.AppDataDirectory, "Converted");
+            Status = "La carpeta destino no permite escritura en Android 10+. Se usará almacenamiento interno.\nLos archivos convertidos estarán aquí.";
+        }
+
+        _actualOutputFolder = finalDest;
+        System.IO.Directory.CreateDirectory(finalDest);
+
+        Status = "Convirtiendo...";
+        try
+        {
+            await _converter.ConvertFolderAsync(SourceFolder, finalDest);
+            Status = $"Conversión completada. Archivos en: {finalDest}";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error: {ex.Message}";
+        }
     }
 
-    // Si la carpeta de destino no es escribible (Android), usamos una interna
-    string finalDest = DestFolder;
-    try
+    private void OpenOutputFolder()
     {
-        // Intenta crear un archivo de prueba para ver si hay acceso
-        var testPath = System.IO.Path.Combine(DestFolder, ".writetest");
-        System.IO.File.WriteAllText(testPath, "test");
-        System.IO.File.Delete(testPath);
-    }
-    catch
-    {
-        // Usar carpeta interna segura
-        finalDest = System.IO.Path.Combine(FileSystem.AppDataDirectory, "Converted");
-        Status = "Usando carpeta interna (acceso denegado a la seleccionada).";
-    }
+        if (string.IsNullOrEmpty(_actualOutputFolder))
+        {
+            Status = "Primero realiza una conversión.";
+            return;
+        }
 
-    Status = "Convirtiendo...";
-    try
-    {
-        await _converter.ConvertFolderAsync(SourceFolder, finalDest);
-        Status = $"Conversión completada. Archivos en: {finalDest}";
+        try
+        {
+            // Abrir la carpeta con el administrador de archivos de Android
+#if ANDROID
+            var context = Android.App.Application.Context;
+            var intent = new Android.Content.Intent(Android.Content.Intent.ActionView);
+            var uri = AndroidX.DocumentFile.Provider.DocumentFile.FromFile(new Java.IO.File(_actualOutputFolder));
+            intent.SetData(Android.Net.Uri.Parse(_actualOutputFolder));
+            intent.SetType("resource/folder");
+            context.StartActivity(intent);
+#else
+            Status = "Abrir carpeta solo disponible en Android.";
+#endif
+        }
+        catch (Exception ex)
+        {
+            Status = $"No se pudo abrir la carpeta: {ex.Message}";
+            // Alternativa: copiar la ruta al portapapeles
+        }
     }
-    catch (Exception ex)
-    {
-        Status = $"Error: {ex.Message}";
-    }
-}
 
     private async Task SafeExecute(Func<Task> action)
     {
