@@ -4,8 +4,8 @@
        x:Class="POPSManager.Android.AppShell">
 
     <TabBar>
-        <ShellContent Title="Inicio" ContentTemplate="{DataTemplate views:HomePage}" />
-        <ShellContent Title="Convertir" ContentTemplate="{DataTemplate views:ConvertPage}" />
-        <ShellContent Title="Procesar" ContentTemplate="{DataTemplate views:ProcessPopsPage}" />
+        <ShellContent Route="Inicio"    Title="Inicio"    ContentTemplate="{DataTemplate views:HomePage}" />
+        <ShellContent Route="Convertir" Title="Convertir" ContentTemplate="{DataTemplate views:ConvertPage}" />
+        <ShellContent Route="Procesar"  Title="Procesar"  ContentTemplate="{DataTemplate views:ProcessPopsPage}" />
     </TabBar>
 </Shell>
