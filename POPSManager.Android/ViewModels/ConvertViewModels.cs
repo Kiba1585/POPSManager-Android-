@@ -101,24 +101,40 @@ public class ConvertViewModel : BindableObject
     }
 
     private async Task ConvertFiles()
+{
+    if (string.IsNullOrEmpty(SourceFolder) || string.IsNullOrEmpty(DestFolder))
     {
-        if (string.IsNullOrEmpty(SourceFolder) || string.IsNullOrEmpty(DestFolder))
-        {
-            Status = "Selecciona origen y destino primero.";
-            return;
-        }
-
-        Status = "Convirtiendo...";
-        try
-        {
-            await _converter.ConvertFolderAsync(SourceFolder, DestFolder);
-            Status = "Conversión completada.";
-        }
-        catch (Exception ex)
-        {
-            Status = $"Error: {ex.Message}";
-        }
+        Status = "Selecciona origen y destino primero.";
+        return;
     }
+
+    // Si la carpeta de destino no es escribible (Android), usamos una interna
+    string finalDest = DestFolder;
+    try
+    {
+        // Intenta crear un archivo de prueba para ver si hay acceso
+        var testPath = System.IO.Path.Combine(DestFolder, ".writetest");
+        System.IO.File.WriteAllText(testPath, "test");
+        System.IO.File.Delete(testPath);
+    }
+    catch
+    {
+        // Usar carpeta interna segura
+        finalDest = System.IO.Path.Combine(FileSystem.AppDataDirectory, "Converted");
+        Status = "Usando carpeta interna (acceso denegado a la seleccionada).";
+    }
+
+    Status = "Convirtiendo...";
+    try
+    {
+        await _converter.ConvertFolderAsync(SourceFolder, finalDest);
+        Status = $"Conversión completada. Archivos en: {finalDest}";
+    }
+    catch (Exception ex)
+    {
+        Status = $"Error: {ex.Message}";
+    }
+}
 
     private async Task SafeExecute(Func<Task> action)
     {
