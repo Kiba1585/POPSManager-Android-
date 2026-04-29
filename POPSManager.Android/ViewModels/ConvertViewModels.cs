@@ -50,9 +50,9 @@ public class ConvertViewModel : BindableObject
         _converter = converter;
         _log = log;
 
-        SelectSourceCommand = new Command(async () => await SelectSource());
-        SelectDestCommand = new Command(async () => await SelectDest());
-        ConvertCommand = new Command(async () => await ConvertFiles());
+        SelectSourceCommand = new Command(async () => await SafeExecute(SelectSource));
+        SelectDestCommand = new Command(async () => await SafeExecute(SelectDest));
+        ConvertCommand = new Command(async () => await SafeExecute(ConvertFiles));
     }
 
     private async Task SelectSource()
@@ -70,32 +70,65 @@ public class ConvertViewModel : BindableObject
     private void LoadFiles()
     {
         Files.Clear();
-        if (!Directory.Exists(SourceFolder)) return;
+        if (string.IsNullOrEmpty(SourceFolder) || !Directory.Exists(SourceFolder))
+            return;
 
-        var files = Directory.GetFiles(SourceFolder, "*.*")
-            .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
-            .Select(f => new FileItem
-            {
-                Name = Path.GetFileName(f),
-                Icon = Path.GetExtension(f).ToLowerInvariant() switch
+        try
+        {
+            var files = Directory.GetFiles(SourceFolder, "*.*")
+                .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+                .Select(f => new FileItem
                 {
-                    ".bin" => "💾",
-                    ".cue" => "📄",
-                    ".iso" => "💿",
-                    _ => "📁"
-                }
-            })
-            .ToList();
+                    Name = Path.GetFileName(f),
+                    Icon = Path.GetExtension(f).ToLowerInvariant() switch
+                    {
+                        ".bin" => "💾",
+                        ".cue" => "📄",
+                        ".iso" => "💿",
+                        _ => "📁"
+                    }
+                })
+                .ToList();
 
-        foreach (var f in files) Files.Add(f);
+            foreach (var f in files) Files.Add(f);
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error al listar archivos: {ex.Message}";
+        }
     }
 
     private async Task ConvertFiles()
     {
+        if (string.IsNullOrEmpty(SourceFolder) || string.IsNullOrEmpty(DestFolder))
+        {
+            Status = "Selecciona origen y destino primero.";
+            return;
+        }
+
         Status = "Convirtiendo...";
-        await _converter.ConvertFolderAsync(SourceFolder, DestFolder);
-        Status = "Conversión completada.";
+        try
+        {
+            await _converter.ConvertFolderAsync(SourceFolder, DestFolder);
+            Status = "Conversión completada.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task SafeExecute(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error: {ex.Message}";
+        }
     }
 }
