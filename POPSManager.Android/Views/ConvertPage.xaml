@@ -19,6 +19,9 @@
 
             <Label Text="{Binding Status}" FontSize="14" TextColor="#CCCCCC" />
 
+            <!-- Botón para abrir la carpeta real de salida -->
+            <Button Text="Abrir carpeta de salida" Command="{Binding OpenOutputFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" />
+
             <CollectionView ItemsSource="{Binding Files}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
