@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
-using Microsoft.Maui.Storage;
 using POPSManager.Core.Services;
 
 namespace POPSManager.Android.ViewModels;
@@ -43,49 +42,19 @@ public class HomeViewModel : BindableObject
         ChangeSourceFolderCommand = new Command(async () => await SafeExecute(ChangeSourceFolder));
         ChangeDestinationFolderCommand = new Command(async () => await SafeExecute(ChangeDestinationFolder));
         ChangeElfFolderCommand = new Command(async () => await SafeExecute(ChangeElfFolder));
-        OpenConvertCommand = new Command(async () => await SafeExecute(OpenConvert));
-        OpenProcessPopsCommand = new Command(async () => await SafeExecute(OpenProcessPops));
+        OpenConvertCommand = new Command(async () => await NavegarA("Convertir"));
+        OpenProcessPopsCommand = new Command(async () => await NavegarA("Procesar"));
         OpenRootFolderCommand = new Command(OpenRootFolder);
         OpenElfFolderCommand = new Command(OpenElfFolder);
 
         LoadData();
     }
 
-    #region Properties
-
-    public string SourcePath
-    {
-        get => _sourcePath;
-        set => SetProperty(ref _sourcePath, value);
-    }
-
-    public string DestinationPath
-    {
-        get => _destinationPath;
-        set => SetProperty(ref _destinationPath, value);
-    }
-
-    public string ElfFolderPath
-    {
-        get => _elfFolderPath;
-        set => SetProperty(ref _elfFolderPath, value);
-    }
-
-    public bool ProcessSubfolders
-    {
-        get => _processSubfolders;
-        set => SetProperty(ref _processSubfolders, value);
-    }
-
-    public string SystemInfo
-    {
-        get => _systemInfo;
-        set => SetProperty(ref _systemInfo, value);
-    }
-
-    #endregion
-
-    #region Commands
+    public string SourcePath { get => _sourcePath; set => SetProperty(ref _sourcePath, value); }
+    public string DestinationPath { get => _destinationPath; set => SetProperty(ref _destinationPath, value); }
+    public string ElfFolderPath { get => _elfFolderPath; set => SetProperty(ref _elfFolderPath, value); }
+    public bool ProcessSubfolders { get => _processSubfolders; set => SetProperty(ref _processSubfolders, value); }
+    public string SystemInfo { get => _systemInfo; set => SetProperty(ref _systemInfo, value); }
 
     public ICommand ChangeSourceFolderCommand { get; }
     public ICommand ChangeDestinationFolderCommand { get; }
@@ -94,10 +63,6 @@ public class HomeViewModel : BindableObject
     public ICommand OpenProcessPopsCommand { get; }
     public ICommand OpenRootFolderCommand { get; }
     public ICommand OpenElfFolderCommand { get; }
-
-    #endregion
-
-    #region Methods
 
     private void LoadData()
     {
@@ -129,7 +94,6 @@ public class HomeViewModel : BindableObject
         _settings.DestinationFolder = path;
         _settings.RootFolder = path;
         DestinationPath = path;
-
         await _settings.SaveAsync();
     }
 
@@ -140,35 +104,16 @@ public class HomeViewModel : BindableObject
 
         _settings.ElfFolder = path;
         ElfFolderPath = path;
-
         await _settings.SaveAsync();
     }
 
-    private Task OpenConvert()
+    private async Task NavegarA(string ruta)
     {
-        _log.Log("Abrir Convert (pendiente)");
-        return Task.CompletedTask;
+        await Shell.Current.GoToAsync($"//{ruta}");
     }
 
-    private Task OpenProcessPops()
-    {
-        _log.Log("Abrir Process POPS (pendiente)");
-        return Task.CompletedTask;
-    }
-
-    private void OpenRootFolder()
-    {
-        _log.Log($"Abrir carpeta root: {_paths.RootFolder}");
-    }
-
-    private void OpenElfFolder()
-    {
-        _log.Log($"Abrir carpeta ELF: {ElfFolderPath}");
-    }
-
-    #endregion
-
-    #region Helpers
+    private void OpenRootFolder() { /* TODO */ }
+    private void OpenElfFolder() { /* TODO */ }
 
     private async Task SafeExecute(Func<Task> action)
     {
@@ -191,11 +136,8 @@ public class HomeViewModel : BindableObject
     {
         if (EqualityComparer<T>.Default.Equals(backingStore, value))
             return false;
-
         backingStore = value;
         OnPropertyChanged(propertyName);
         return true;
     }
-
-    #endregion
 }
