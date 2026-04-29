@@ -17,14 +17,14 @@ namespace POPSManager.Android;
                            ConfigChanges.Density)]
 public class MainActivity : MauiAppCompatActivity
 {
-    protected override void OnCreate(Bundle savedInstanceState)
+    protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
 
         // Solicitar permiso MANAGE_EXTERNAL_STORAGE en Android 11+
         if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
         {
-            if (!Android.OS.Environment.IsExternalStorageManager)
+            if (!global::Android.OS.Environment.IsExternalStorageManager)
             {
                 var intent = new Intent(Settings.ActionManageAllFilesAccessPermission);
                 StartActivity(intent);
