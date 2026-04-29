@@ -9,6 +9,7 @@ using POPSManager.Core.Localization;
 using POPSManager.Core.Settings;
 using POPSManager.Android.ViewModels;
 using POPSManager.Android.Views;
+using POPSManager.Android.Services;   // Para PathsServiceAndroid
 
 namespace POPSManager.Android;
 
@@ -23,8 +24,15 @@ public static class MauiProgram
             .UseMauiCommunityToolkit();
 
         // 🔹 Servicios del Core
-        builder.Services.AddSingleton<IPathsService, PathsService>();
+
+        // Interfaces → implementaciones Android
+        builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();   // Usar versión Android
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
+
+        // Clases concretas que esperan algunos constructores (como GameProcessor)
+        builder.Services.AddSingleton<LoggingService>();          // Resuelve LoggingService directamente
+        builder.Services.AddSingleton<PathsService>();           // Resuelve PathsService directamente
+
         builder.Services.AddSingleton<ConverterService>();
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<NotificationService>();
