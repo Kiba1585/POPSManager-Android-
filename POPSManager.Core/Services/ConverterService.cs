@@ -29,10 +29,8 @@ public class ConverterService
 
         Directory.CreateDirectory(outputFolder);
 
-        var files = Directory.GetFiles(sourceFolder, "*.*")
-            .Where(f => f.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+        // Solo convertimos archivos .bin (imágenes PS1)
+        var files = Directory.GetFiles(sourceFolder, "*.bin", SearchOption.TopDirectoryOnly)
             .OrderBy(f => f)
             .ToArray();
 
