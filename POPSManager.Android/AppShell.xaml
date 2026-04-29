@@ -3,5 +3,9 @@
        xmlns:views="clr-namespace:POPSManager.Android.Views"
        x:Class="POPSManager.Android.AppShell">
 
-    <ShellContent Title="Inicio" ContentTemplate="{DataTemplate views:HomePage}" />
+    <TabBar>
+        <ShellContent Title="Inicio" ContentTemplate="{DataTemplate views:HomePage}" />
+        <ShellContent Title="Convertir" ContentTemplate="{DataTemplate views:ConvertPage}" />
+        <ShellContent Title="Procesar" ContentTemplate="{DataTemplate views:ProcessPopsPage}" />
+    </TabBar>
 </Shell>
