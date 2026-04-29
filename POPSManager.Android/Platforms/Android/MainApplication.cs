@@ -1,6 +1,5 @@
 using Android.App;
 using Android.Runtime;
-using Android.App;
 using System;
 
 namespace POPSManager.Android;
@@ -22,7 +21,6 @@ public class MainApplication : MauiApplication
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine("Error en MainApplication.OnCreate: " + ex.ToString());
-            // Mostrar un diálogo nativo si es necesario
             try
             {
                 new AlertDialog.Builder(this)
