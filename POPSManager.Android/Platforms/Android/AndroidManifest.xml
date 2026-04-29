@@ -2,17 +2,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.raideldev.popsmanager">
 
-    <!-- Permisos básicos -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    
-    <!-- Permiso especial para Android 11+ (acceso a todos los archivos) -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+
     <application
         android:allowBackup="true"
         android:label="POPSManager"
         android:supportsRtl="true"
-        android:requestLegacyExternalStorage="true" />
+        android:requestLegacyExternalStorage="true">
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                       android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
 </manifest>
