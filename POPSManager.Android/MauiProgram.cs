@@ -27,9 +27,12 @@ public static class MauiProgram
 
         // 🔹 ViewModels
         builder.Services.AddTransient<HomeViewModel>();
+        builder.Services.AddTransient<ConvertViewModel>();
 
         // 🔹 Páginas
         builder.Services.AddTransient<HomePage>();
+        builder.Services.AddTransient<ConvertPage>();
+        builder.Services.AddTransient<ProcessPopsPage>();
 
         // 🔹 AppShell
         builder.Services.AddTransient<AppShell>();
