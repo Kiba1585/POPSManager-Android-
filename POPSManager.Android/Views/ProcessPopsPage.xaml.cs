@@ -14,7 +14,6 @@ public partial class ProcessPopsPage : ContentPage
         catch (Exception ex)
         {
             InitializeComponent();
-            BindingContext = null;
             Content = new Label
             {
                 Text = $"Error al cargar: {ex.Message}",
