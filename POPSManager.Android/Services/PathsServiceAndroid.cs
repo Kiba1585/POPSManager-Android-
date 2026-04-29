@@ -71,14 +71,12 @@ public class PathsServiceAndroid : IPathsService
                 new Java.IO.File(folderPath));
 
             var intent = new Intent(Intent.ActionView);
-            intent.SetDataAndType(uri, "resource/folder"); // fallback general
+            intent.SetDataAndType(uri, "resource/folder");
             intent.AddFlags(ActivityFlags.GrantReadUriPermission);
             intent.AddFlags(ActivityFlags.NewTask);
 
-            // Intentar abrir con un explorador de archivos conocido
             if (intent.ResolveActivity(context.PackageManager) == null)
             {
-                // Alternativa con esquema content://
                 var docUri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/" +
                     folderPath.Replace("/storage/emulated/0/", "primary%3A"));
                 intent.SetDataAndType(docUri, DocumentsContract.Document.MimeTypeDir);
@@ -94,7 +92,4 @@ public class PathsServiceAndroid : IPathsService
 
     public void SetElfPath(string path) => PopstarterElfPath = path;
     public void SetPs2ElfPath(string path) => PopstarterPs2ElfPath = path;
-
-    // Interfaz IPathsService requiere estos métodos extra? Asegurémonos de que existen.
-    public async Task<string?> SelectFolderAsync() { ... } // ya implementado
 }
