@@ -1,3 +1,4 @@
+using System;
 using POPSManager.Android.ViewModels;
 
 namespace POPSManager.Android.Views;
@@ -14,12 +15,24 @@ public partial class ProcessPopsPage : ContentPage
         catch (Exception ex)
         {
             InitializeComponent();
-            Content = new Label
+            // Mostrar el error en la página en lugar de cerrar la app
+            Content = new VerticalStackLayout
             {
-                Text = $"Error al cargar: {ex.Message}",
-                TextColor = Colors.Red,
-                VerticalOptions = LayoutOptions.Center,
-                HorizontalOptions = LayoutOptions.Center
+                Padding = 20,
+                Children =
+                {
+                    new Label
+                    {
+                        Text = "Error al cargar la página de Procesar:",
+                        TextColor = Colors.Red,
+                        FontAttributes = FontAttributes.Bold
+                    },
+                    new Label
+                    {
+                        Text = ex.ToString(),
+                        TextColor = Colors.Red
+                    }
+                }
             };
         }
     }
