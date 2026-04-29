@@ -103,6 +103,17 @@ public class ConvertViewModel : BindableObject
         }
     }
 
+    private bool TienePermisoAllFiles()
+    {
+#if ANDROID
+        if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R)
+        {
+            return Android.OS.Environment.IsExternalStorageManager;
+        }
+#endif
+        return true;
+    }
+
     private async Task ConvertFiles()
     {
         if (string.IsNullOrEmpty(SourceFolder) || string.IsNullOrEmpty(DestFolder))
@@ -111,24 +122,44 @@ public class ConvertViewModel : BindableObject
             return;
         }
 
+        // Verificar si tenemos permiso total de acceso a archivos
+        if (!TienePermisoAllFiles())
+        {
+#if ANDROID
+            Status = "Se necesita permiso 'Todos los archivos'. Actívalo en Ajustes > Aplicaciones > POPSManager.";
+            var intent = new Android.Content.Intent(Android.Provider.Settings.ActionManageAllFilesAccessPermission);
+            Android.App.Application.Context.StartActivity(intent);
+#endif
+            return;
+        }
+
         string finalDest = DestFolder;
 
         // Verificar si la carpeta destino es escribible
-        if (_paths is Services.PathsServiceAndroid androidPaths && androidPaths.IsFolderWritable(DestFolder))
+        bool puedeEscribir = false;
+        try
         {
-            // Se puede escribir directamente
+            var testFile = Path.Combine(DestFolder, ".writetest");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+            puedeEscribir = true;
+        }
+        catch { }
+
+        if (!puedeEscribir)
+        {
+            // Fallback a carpeta interna
+            finalDest = Path.Combine(FileSystem.AppDataDirectory, "Converted");
+            Status = "No se pudo escribir en la carpeta seleccionada. Se usará almacenamiento interno.";
         }
         else
         {
-            // Usar carpeta interna segura
-            finalDest = (_paths as Services.PathsServiceAndroid)?.SafeOutputFolder ?? Path.Combine(FileSystem.AppDataDirectory, "Converted");
-            Status = "La carpeta destino no permite escritura en Android 10+. Se usará almacenamiento interno.\nLos archivos convertidos estarán aquí.";
+            Status = "Convirtiendo...";
         }
 
         _actualOutputFolder = finalDest;
-        System.IO.Directory.CreateDirectory(finalDest);
+        Directory.CreateDirectory(finalDest);
 
-        Status = "Convirtiendo...";
         try
         {
             await _converter.ConvertFolderAsync(SourceFolder, finalDest);
@@ -150,22 +181,18 @@ public class ConvertViewModel : BindableObject
 
         try
         {
-            // Abrir la carpeta con el administrador de archivos de Android
 #if ANDROID
             var context = Android.App.Application.Context;
             var intent = new Android.Content.Intent(Android.Content.Intent.ActionView);
-            var uri = AndroidX.DocumentFile.Provider.DocumentFile.FromFile(new Java.IO.File(_actualOutputFolder));
-            intent.SetData(Android.Net.Uri.Parse(_actualOutputFolder));
-            intent.SetType("resource/folder");
+            var uri = Android.Net.Uri.Parse(_actualOutputFolder);
+            intent.SetDataAndType(uri, "resource/folder");
+            intent.AddFlags(Android.Content.ActivityFlags.NewTask);
             context.StartActivity(intent);
-#else
-            Status = "Abrir carpeta solo disponible en Android.";
 #endif
         }
         catch (Exception ex)
         {
             Status = $"No se pudo abrir la carpeta: {ex.Message}";
-            // Alternativa: copiar la ruta al portapapeles
         }
     }
 
