@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Maui.Controls;
 using POPSManager.Android.ViewModels;
 
 namespace POPSManager.Android.Views;
@@ -14,8 +15,8 @@ public partial class ProcessPopsPage : ContentPage
         }
         catch (Exception ex)
         {
-            InitializeComponent();
-            // Mostrar el error en la página en lugar de cerrar la app
+            // Si el ViewModel es nulo o falla la asignación, mostramos el error
+            InitializeComponent(); // Aseguramos que se inicialice la vista
             Content = new VerticalStackLayout
             {
                 Padding = 20,
@@ -23,7 +24,7 @@ public partial class ProcessPopsPage : ContentPage
                 {
                     new Label
                     {
-                        Text = "Error al cargar la página de Procesar:",
+                        Text = "Error al cargar Procesar:",
                         TextColor = Colors.Red,
                         FontAttributes = FontAttributes.Bold
                     },
