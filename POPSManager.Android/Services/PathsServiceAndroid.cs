@@ -1,25 +1,25 @@
+using Android.Content;
+using AndroidX.Core.Content;
 using CommunityToolkit.Maui.Storage;
 using POPSManager.Core.Services;
+using System.IO;
+using System.Threading.Tasks;
+using AndroidUri = Android.Net.Uri;
 
 namespace POPSManager.Android.Services;
 
 public class PathsServiceAndroid : IPathsService
 {
     public string RootFolder { get; set; } = "/storage/emulated/0/POPSManager";
-    public string PopsFolder => System.IO.Path.Combine(RootFolder, "POPS");
-    public string AppsFolder => System.IO.Path.Combine(RootFolder, "APPS");
-    public string CfgFolder => System.IO.Path.Combine(RootFolder, "CFG");
-    public string ArtFolder => System.IO.Path.Combine(RootFolder, "ART");
-    public string DvdFolder => System.IO.Path.Combine(RootFolder, "DVD");
+    public string PopsFolder => Path.Combine(RootFolder, "POPS");
+    public string AppsFolder => Path.Combine(RootFolder, "APPS");
+    public string CfgFolder => Path.Combine(RootFolder, "CFG");
+    public string ArtFolder => Path.Combine(RootFolder, "ART");
+    public string DvdFolder => Path.Combine(RootFolder, "DVD");
     public string PopstarterElfPath { get; set; } = "";
     public string PopstarterPs2ElfPath { get; set; } = "";
     public string TempFolder => FileSystem.CacheDirectory;
-
-    /// <summary>
-    /// Carpeta interna de la aplicación donde siempre es posible escribir.
-    /// Se puede usar como destino seguro cuando la ruta externa falle.
-    /// </summary>
-    public string SafeOutputFolder => System.IO.Path.Combine(FileSystem.AppDataDirectory, "Output");
+    public string SafeOutputFolder => Path.Combine(FileSystem.AppDataDirectory, "Output");
 
     public async Task<string?> SelectFolderAsync()
     {
@@ -40,9 +40,6 @@ public class PathsServiceAndroid : IPathsService
         return result?.FullPath;
     }
 
-    /// <summary>
-    /// Comprueba si una carpeta permite escritura real.
-    /// </summary>
     public bool IsFolderWritable(string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
@@ -50,9 +47,9 @@ public class PathsServiceAndroid : IPathsService
 
         try
         {
-            var testFile = System.IO.Path.Combine(folderPath, ".writetest");
-            System.IO.File.WriteAllText(testFile, "test");
-            System.IO.File.Delete(testFile);
+            var testFile = Path.Combine(folderPath, ".writetest");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
             return true;
         }
         catch
@@ -61,6 +58,43 @@ public class PathsServiceAndroid : IPathsService
         }
     }
 
+    public void OpenFolder(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+            return;
+
+        try
+        {
+            var context = Android.App.Application.Context;
+            var uri = FileProvider.GetUriForFile(context,
+                context.PackageName + ".fileprovider",
+                new Java.IO.File(folderPath));
+
+            var intent = new Intent(Intent.ActionView);
+            intent.SetDataAndType(uri, "resource/folder"); // fallback general
+            intent.AddFlags(ActivityFlags.GrantReadUriPermission);
+            intent.AddFlags(ActivityFlags.NewTask);
+
+            // Intentar abrir con un explorador de archivos conocido
+            if (intent.ResolveActivity(context.PackageManager) == null)
+            {
+                // Alternativa con esquema content://
+                var docUri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/" +
+                    folderPath.Replace("/storage/emulated/0/", "primary%3A"));
+                intent.SetDataAndType(docUri, DocumentsContract.Document.MimeTypeDir);
+            }
+
+            context.StartActivity(intent);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine("No se pudo abrir la carpeta: " + ex.Message);
+        }
+    }
+
     public void SetElfPath(string path) => PopstarterElfPath = path;
     public void SetPs2ElfPath(string path) => PopstarterPs2ElfPath = path;
+
+    // Interfaz IPathsService requiere estos métodos extra? Asegurémonos de que existen.
+    public async Task<string?> SelectFolderAsync() { ... } // ya implementado
 }
