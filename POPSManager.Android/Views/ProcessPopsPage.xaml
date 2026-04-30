@@ -4,7 +4,6 @@
              x:Class="POPSManager.Android.Views.ProcessPopsPage"
              Title="Procesar POPS">
 
-    <!-- Recursos de la página -->
     <ContentPage.Resources>
         <DataTemplate x:Key="GameListTemplate">
             <Label Text="{Binding Name}"
@@ -47,8 +46,8 @@
                     </HorizontalStackLayout>
 
                     <HorizontalStackLayout Spacing="10">
-                        <Switch IsToggled="{Binding CheatForcePal60}" />
-                        <Label Text="Forzar PAL60"
+                        <Switch IsToggled="{Binding CheatNoPal}" />
+                        <Label Text="Desactivar PAL ($NOPAL)"
                                TextColor="White"
                                VerticalOptions="Center" />
                     </HorizontalStackLayout>
