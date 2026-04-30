@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Storage;
+using Microsoft.Maui.ApplicationModel.DataTransfer;
 using POPSManager.Android.ViewModels;
 
 namespace POPSManager.Android.Views;
@@ -27,13 +28,15 @@ public partial class ProcessPopsPage : ContentPage
         {
             _lastError = ex.ToString();
 
-            // Mostrar el error con botones de acción
-            var errorLabel = new Label
+            // Editor para mostrar el error con posibilidad de seleccionar y copiar
+            var errorEditor = new Editor
             {
                 Text = _lastError,
                 TextColor = Colors.Red,
                 FontSize = 12,
-                Margin = new Thickness(0, 10)
+                IsReadOnly = true,
+                AutoSize = EditorAutoSizeOption.TextChanges,
+                HeightRequest = 200
             };
 
             var copyButton = new Button
@@ -69,7 +72,7 @@ public partial class ProcessPopsPage : ContentPage
             var shareButton = new Button
             {
                 Text = "Compartir error",
-                BackgroundColor = Colors.Grey
+                BackgroundColor = Colors.Gray
             };
             shareButton.Clicked += async (s, e) =>
             {
@@ -93,7 +96,7 @@ public partial class ProcessPopsPage : ContentPage
                         FontAttributes = FontAttributes.Bold,
                         FontSize = 18
                     },
-                    errorLabel,
+                    errorEditor,
                     copyButton,
                     saveButton,
                     shareButton
