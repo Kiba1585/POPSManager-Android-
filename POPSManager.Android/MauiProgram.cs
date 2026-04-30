@@ -24,27 +24,21 @@ public static class MauiProgram
             .UseMauiCommunityToolkit();
 
         // 🔹 Servicios del Core – interfaces y clases concretas
-
-        // Paths → única implementación para Android
         builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
-        // Logging
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
         builder.Services.AddSingleton<LoggingService>();
 
-        // ConverterService sin delegados
+        // ConverterService con delegados para progreso (se configurarán en ConvertViewModel)
         builder.Services.AddSingleton<ConverterService>(sp =>
             new ConverterService(null, null));
 
-        // Notification, Settings, Localization
         builder.Services.AddSingleton<NotificationService>();
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<LocalizationService>();
 
-        // Automation
         builder.Services.AddSingleton<AutomationSettings>();
         builder.Services.AddSingleton<AutomationEngine>();
 
-        // Cheats → factoría con rootFolder y log
         builder.Services.AddSingleton<CheatSettingsService>(sp =>
         {
             var paths = sp.GetRequiredService<IPathsService>();
@@ -53,7 +47,6 @@ public static class MauiProgram
         });
         builder.Services.AddSingleton<CheatManagerService>();
 
-        // GameProcessor (ya no necesita PathsService concreto)
         builder.Services.AddSingleton<GameProcessor>();
 
         // 🔹 ViewModels
