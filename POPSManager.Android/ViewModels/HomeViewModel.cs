@@ -25,7 +25,6 @@ public class HomeViewModel : BindableObject
 
     private string _sourcePath = string.Empty;
     private string _destinationPath = string.Empty;
-    private string _elfFolderPath = string.Empty;
     private bool _processSubfolders = true;
     private string _systemInfo = string.Empty;
 
@@ -42,39 +41,33 @@ public class HomeViewModel : BindableObject
 
         ChangeSourceFolderCommand = new Command(async () => await SafeExecute(ChangeSourceFolder));
         ChangeDestinationFolderCommand = new Command(async () => await SafeExecute(ChangeDestinationFolder));
-        ChangeElfFolderCommand = new Command(async () => await SafeExecute(ChangeElfFolder));
         OpenConvertCommand = new Command(async () => await NavegarA("Convertir"));
         OpenProcessPopsCommand = new Command(async () => await NavegarA("Procesar"));
         OpenRootFolderCommand = new Command(OpenRootFolder);
-        OpenElfFolderCommand = new Command(OpenElfFolder);
 
         LoadData();
     }
 
     public string SourcePath { get => _sourcePath; set => SetProperty(ref _sourcePath, value); }
     public string DestinationPath { get => _destinationPath; set => SetProperty(ref _destinationPath, value); }
-    public string ElfFolderPath { get => _elfFolderPath; set => SetProperty(ref _elfFolderPath, value); }
     public bool ProcessSubfolders { get => _processSubfolders; set => SetProperty(ref _processSubfolders, value); }
     public string SystemInfo { get => _systemInfo; set => SetProperty(ref _systemInfo, value); }
 
     public ICommand ChangeSourceFolderCommand { get; }
     public ICommand ChangeDestinationFolderCommand { get; }
-    public ICommand ChangeElfFolderCommand { get; }
     public ICommand OpenConvertCommand { get; }
     public ICommand OpenProcessPopsCommand { get; }
     public ICommand OpenRootFolderCommand { get; }
-    public ICommand OpenElfFolderCommand { get; }
 
     private void LoadData()
     {
         SourcePath = _settings.SourceFolder ?? string.Empty;
         DestinationPath = _settings.DestinationFolder ?? string.Empty;
-        ElfFolderPath = _settings.ElfFolder ?? string.Empty;
 
         SystemInfo =
             $"Versión: 1.0.0 Android\n" +
             $"Directorio base: {FileSystem.AppDataDirectory}\n" +
-            $"Raíz: {_paths.RootFolder}";
+            $"Raíz OPL: {_paths.RootFolder}";
     }
 
     private async Task ChangeSourceFolder()
@@ -96,23 +89,13 @@ public class HomeViewModel : BindableObject
         _settings.RootFolder = path;
         DestinationPath = path;
 
-        // Crear la estructura de carpetas OPL dentro de la ruta seleccionada
+        // Actualizar raíz OPL y crear estructura
         if (_paths is PathsServiceAndroid androidPaths)
         {
-            androidPaths.RootFolder = path; // actualizar raíz
-            androidPaths.EnsureOplFoldersExist();
+            androidPaths.RootFolder = path;
+            // EnsureOplFoldersExist se llama automáticamente al asignar RootFolder
         }
 
-        await _settings.SaveAsync();
-    }
-
-    private async Task ChangeElfFolder()
-    {
-        var path = await _paths.SelectFolderAsync();
-        if (path == null) return;
-
-        _settings.ElfFolder = path;
-        ElfFolderPath = path;
         await _settings.SaveAsync();
     }
 
@@ -121,8 +104,11 @@ public class HomeViewModel : BindableObject
         await Shell.Current.GoToAsync($"//{ruta}");
     }
 
-    private void OpenRootFolder() { /* TODO */ }
-    private void OpenElfFolder() { /* TODO */ }
+    private void OpenRootFolder()
+    {
+        if (!string.IsNullOrEmpty(DestinationPath))
+            _paths.OpenFolder(DestinationPath);
+    }
 
     private async Task SafeExecute(Func<Task> action)
     {
