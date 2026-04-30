@@ -3,6 +3,7 @@ using System.Windows.Input;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using POPSManager.Core.Services;
+using POPSManager.Android.Services;
 
 namespace POPSManager.Android.ViewModels;
 
@@ -94,6 +95,14 @@ public class HomeViewModel : BindableObject
         _settings.DestinationFolder = path;
         _settings.RootFolder = path;
         DestinationPath = path;
+
+        // Crear la estructura de carpetas OPL dentro de la ruta seleccionada
+        if (_paths is PathsServiceAndroid androidPaths)
+        {
+            androidPaths.RootFolder = path; // actualizar raíz
+            androidPaths.EnsureOplFoldersExist();
+        }
+
         await _settings.SaveAsync();
     }
 
