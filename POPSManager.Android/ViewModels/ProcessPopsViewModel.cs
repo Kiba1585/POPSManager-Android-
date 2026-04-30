@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
-using POPSManager.Core.Logic.Covers;
 using POPSManager.Core.Services;
 using POPSManager.Android.Services;
 
@@ -33,9 +32,9 @@ public class ProcessPopsViewModel : BindableObject
         public override string ToString() => Name;
     }
 
-    // Opciones de cheats actualizadas
+    // Opciones de cheats
     private bool _cheatWidescreen;
-    private bool _cheatNoPal;          // en lugar de ForcePal60
+    private bool _cheatNoPal;
     private bool _cheatFixSound;
     private bool _cheatFixGraphics;
 
@@ -191,7 +190,7 @@ public class ProcessPopsViewModel : BindableObject
     {
         if (!Ps1Games.Any() && !Ps2Games.Any())
         {
-            Status = "No hay juegos para procesar. Revisa la carpeta POPS/DVD.";
+            Status = "No hay juegos para procesar.";
             return;
         }
         await GenerateAllElfs();
@@ -206,7 +205,7 @@ public class ProcessPopsViewModel : BindableObject
         string baseElf = _paths.PopstarterElfPath;
         if (!File.Exists(baseElf))
         {
-            Status = $"POPSTARTER.ELF no encontrado en {baseElf}. Cópialo a la raíz de la carpeta destino.";
+            Status = $"POPSTARTER.ELF no encontrado.{Environment.NewLine}Cópialo a la raíz de la carpeta destino.";
             return;
         }
 
@@ -236,7 +235,7 @@ public class ProcessPopsViewModel : BindableObject
         Status = "Generando cheats...";
         var extraLines = new List<string>();
         if (_cheatWidescreen) extraLines.Add("WIDESCREEN=ON");
-        if (_cheatNoPal) extraLines.Add("$NOPAL");           // antes era FORCEVIDEO=1
+        if (_cheatNoPal) extraLines.Add("$NOPAL");
         if (_cheatFixSound) extraLines.Add("FIXSOUND=ON");
         if (_cheatFixGraphics) extraLines.Add("FIXGRAPHICS=ON");
 
@@ -251,22 +250,32 @@ public class ProcessPopsViewModel : BindableObject
 
     private async Task DownloadAllCoversAndMetadata()
     {
-        Status = "Descargando covers y metadatos...";
-        int metaCount = 0;
-        foreach (var game in Ps1Games.Concat(Ps2Games))
-        {
-            // Covers (placeholder hasta que haya URLs)
-            string? coverUrl = null;
-            if (coverUrl != null)
-                await ArtDownloader.DownloadArtAsync(game.GameId, coverUrl, _paths.ArtFolder, msg => _log.Log(msg));
-            else
-                _log.Log($"[COVER] Sin URL para {game.GameId}");
+        // Descargar el pack completo de OPLM (covers + metadatos)
+        bool downloaded = await OplArtDownloader.DownloadAndExtractAsync(
+            _paths.RootFolder,
+            msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
+        );
 
-            // Metadatos
-            await MetadataDownloader.DownloadMetadataAsync(game.GameId, game.Name, _paths.CfgFolder, msg => _log.Log(msg));
-            metaCount++;
+        if (!downloaded)
+        {
+            Status = "Error al descargar la base de datos. Verifica la conexión.";
+            return;
         }
-        Status = $"Covers y {metaCount} metadatos actualizados.";
+
+        // Leer metadatos de ejemplo para el primer juego de PS1/PS2
+        var firstGame = Ps1Games.Concat(Ps2Games).FirstOrDefault();
+        if (firstGame != null)
+        {
+            var metadata = await OplMetadataReader.GetCfgMetadataAsync(firstGame.GameId, _paths.CfgFolder);
+            if (!string.IsNullOrEmpty(metadata.Title))
+            {
+                Status = $"Base actualizada. Ejemplo: {metadata.Title} ({metadata.Genre})";
+            }
+        }
+        else
+        {
+            Status = "Base de datos actualizada. No hay juegos para mostrar metadatos.";
+        }
     }
 
     protected bool SetProperty<T>(ref T backingStore, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
