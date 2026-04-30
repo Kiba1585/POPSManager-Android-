@@ -18,7 +18,6 @@ public class ProcessPopsViewModel : BindableObject
     private readonly ILoggingService _log;
     private readonly SettingsService _settings;
 
-    // Juegos con toda la información necesaria
     public ObservableCollection<GameEntry> Ps1Games { get; } = new();
     public ObservableCollection<GameEntry> Ps2Games { get; } = new();
     public ObservableCollection<GameEntry> AppsGames { get; } = new();
@@ -27,8 +26,8 @@ public class ProcessPopsViewModel : BindableObject
     {
         public string GameId { get; set; } = "";
         public string Name { get; set; } = "";
-        public string FolderPath { get; set; } = ""; // para PS1: la carpeta POPS/<juego>
-        public string VcdPath { get; set; } = "";      // ruta al .VCD (si existe)
+        public string FolderPath { get; set; } = "";
+        public string VcdPath { get; set; } = "";
         public bool IsMultiDisc { get; set; }
         public int DiscNumber { get; set; } = 1;
         public override string ToString() => Name;
@@ -52,7 +51,7 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand ProcessAllCommand { get; }
     public ICommand GenerateElfCommand { get; }
     public ICommand GenerateCheatsCommand { get; }
-    public ICommand DownloadCoversAndMetadataCommand { get; }   // unifica covers + metadatos
+    public ICommand DownloadCoversAndMetadataCommand { get; }
     public ICommand RefreshCommand { get; }
 
     public string OplRootFolder { get => _oplRootFolder; set => SetProperty(ref _oplRootFolder, value); }
@@ -150,34 +149,28 @@ public class ProcessPopsViewModel : BindableObject
 
     private GameEntry BuildPs1Entry(string discFolder)
     {
-        // Detectar multidisco y número de disco a partir del nombre de carpeta
         string folderName = Path.GetFileName(discFolder);
-        var discs = Directory.Exists(Path.GetDirectoryName(discFolder))
-            ? Directory.GetFiles(Path.GetDirectoryName(discFolder)!, "DISCS.TXT").Any() ? true : false
-            : false;
+        bool discs = Directory.Exists(Path.GetDirectoryName(discFolder))
+                     && Directory.GetFiles(Path.GetDirectoryName(discFolder)!, "DISCS.TXT").Any();
 
         int discNumber = 1;
         if (discs)
         {
-            // Intentar extraer número de disco del nombre (CD1, DISC1, etc.)
             var name = folderName.ToUpper();
             if (name.Contains("CD2") || name.Contains("DISC2")) discNumber = 2;
             else if (name.Contains("CD3") || name.Contains("DISC3")) discNumber = 3;
             else if (name.Contains("CD4") || name.Contains("DISC4")) discNumber = 4;
-            // si no coincide, asumimos 1
         }
 
-        string vcd = Directory.GetFiles(discFolder, "*.VCD").FirstOrDefault();
+        string vcd = Directory.GetFiles(discFolder, "*.VCD").FirstOrDefault() ?? "";
         string gameId = ExtractGameId(discFolder);
-
-        // Nombre limpio para OPL: solo título, sin Game ID, y con disco si multidisco
         string cleanTitle = NormalizeGameTitle(folderName, discNumber, true);
 
         return new GameEntry
         {
             Name = cleanTitle,
             FolderPath = discFolder,
-            VcdPath = vcd ?? "",
+            VcdPath = vcd,
             GameId = gameId,
             IsMultiDisc = discs,
             DiscNumber = discNumber,
@@ -186,38 +179,35 @@ public class ProcessPopsViewModel : BindableObject
 
     private string NormalizeGameTitle(string rawName, int discNumber, bool includeDiscIfMulti)
     {
-        // Eliminar prefijos tipo "SLES-12345 - "
         string title = rawName;
         int dashIndex = title.IndexOf(" - ");
         if (dashIndex > 0) title = title.Substring(dashIndex + 3).Trim();
         else
         {
-            // Si no hay patrón, quitar cualquier Game ID al inicio
             var parts = title.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 1 && parts[0].Length >= 4 && parts[0].Contains("-")) // tipo SLES-xxxxx
+            if (parts.Length > 1 && parts[0].Length >= 4 && parts[0].Contains("-"))
                 title = parts[1];
         }
 
-        // Añadir número de disco si es multidisco
         if (includeDiscIfMulti && discNumber > 1)
             title += $" (CD{discNumber})";
 
         return title.Trim();
     }
 
+    // ⚠️ Método corregido
     private string ExtractGameId(string path)
     {
         try
         {
-            var id = GameIdDetector.GetGameIdFromPath(path);
+            var id = GameIdDetector.DetectGameId(path);   // ← método correcto
             if (!string.IsNullOrWhiteSpace(id)) return id;
         }
         catch { }
-        // fallback: usar el primer token del nombre de carpeta (antes de " - ")
-        string dirName = Path.GetFileName(path);
-        int idx = dirName.IndexOf(" - ");
-        if (idx > 0 && dirName.Length >= 4) return dirName.Substring(0, idx).Trim();
-        return dirName;
+
+        // fallback: detectar desde el nombre de la carpeta/archivo
+        string name = Path.GetFileNameWithoutExtension(path);
+        return GameIdDetector.DetectFromName(name);
     }
 
     private async Task ProcessAllGames()
@@ -246,14 +236,12 @@ public class ProcessPopsViewModel : BindableObject
                 continue;
             }
 
-            string appsFolder = _paths.AppsFolder;
-            string outputTitle = game.Name; // ya incluye disco si multidisco (CD2, etc.)
-            bool success = ElfGenerator.GeneratePs1Elf(
+            ElfGenerator.GeneratePs1Elf(
                 baseElf,
                 game.VcdPath,
-                appsFolder,
+                _paths.AppsFolder,
                 game.DiscNumber,
-                outputTitle,
+                game.Name,
                 game.GameId,
                 msg => _log.Log(msg));
         }
@@ -281,8 +269,8 @@ public class ProcessPopsViewModel : BindableObject
         Status = "Descargando covers y metadatos...";
         foreach (var game in Ps1Games.Concat(Ps2Games))
         {
-            // Covers
-            string? coverUrl = null; // <-- Aquí conectarás con GameDatabase.TryGetCoverUrl(game.GameId)
+            // Covers (placeholder hasta que haya URLs)
+            string? coverUrl = null;
             if (coverUrl != null)
                 await ArtDownloader.DownloadArtAsync(game.GameId, coverUrl, _paths.ArtFolder, msg => _log.Log(msg));
             else
