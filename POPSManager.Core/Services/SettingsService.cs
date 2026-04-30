@@ -22,9 +22,12 @@ namespace POPSManager.Core.Services
 
         public event Action? OnSettingsChanged;
 
-        public SettingsService()
+        /// <summary>
+        /// Recibe la carpeta donde se almacenará settings.json (por ejemplo, AppDataDirectory).
+        /// </summary>
+        public SettingsService(string appDataFolder)
         {
-            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "POPSManager");
+            string folder = Path.Combine(appDataFolder, "POPSManager");
             Directory.CreateDirectory(folder);
             _settingsPath = Path.Combine(folder, "settings.json");
             Load();
