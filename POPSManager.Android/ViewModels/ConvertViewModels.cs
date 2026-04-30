@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Services;
+using POPSManager.Android.Services;
 
 namespace POPSManager.Android.ViewModels;
 
@@ -98,8 +99,16 @@ public class ConvertViewModel : BindableObject
         if (path != null)
         {
             _settings.DestinationFolder = path;
+            _settings.RootFolder = path;
             await _settings.SaveAsync();
             DestFolder = path;
+
+            // Asegurar que exista la estructura OPL
+            if (_paths is PathsServiceAndroid androidPaths)
+            {
+                androidPaths.RootFolder = path;
+                androidPaths.EnsureOplFoldersExist();
+            }
         }
     }
 
@@ -142,18 +151,30 @@ public class ConvertViewModel : BindableObject
             return;
         }
 
+        // La salida real es la carpeta POPS dentro de la raíz OPL
+        string outputFolder = _paths.PopsFolder;
+        try
+        {
+            Directory.CreateDirectory(outputFolder);
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error al crear carpeta de salida: {ex.Message}";
+            return;
+        }
+
         var progressConverter = new ConverterService(
             log: msg => _log.Log(msg),
             setStatus: msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
         );
 
-        _actualOutputFolder = DestFolder;
+        _actualOutputFolder = outputFolder;   // para abrir después
 
         Status = "Convirtiendo...";
         try
         {
-            await progressConverter.ConvertFolderAsync(SourceFolder, DestFolder);
-            Status = $"Conversión completada. Archivos en: {DestFolder}";
+            await progressConverter.ConvertFolderAsync(SourceFolder, outputFolder);
+            Status = $"Conversión completada. Archivos en: {outputFolder}";
         }
         catch (Exception ex)
         {
