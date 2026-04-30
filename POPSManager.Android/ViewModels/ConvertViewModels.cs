@@ -1,11 +1,9 @@
-using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Services;
-using POPSManager.Android.Services;   // para el cast a PathsServiceAndroid
 
 namespace POPSManager.Android.ViewModels;
 
@@ -20,6 +18,7 @@ public class ConvertViewModel : BindableObject
     private readonly IPathsService _paths;
     private readonly ConverterService _converter;
     private readonly ILoggingService _log;
+    private readonly SettingsService _settings;
 
     private string _sourceFolder = "";
     private string _destFolder = "";
@@ -49,28 +48,60 @@ public class ConvertViewModel : BindableObject
         set { if (_status != value) { _status = value; OnPropertyChanged(); } }
     }
 
-    public ConvertViewModel(IPathsService paths, ConverterService converter, ILoggingService log)
+    public ConvertViewModel(IPathsService paths, ConverterService converter, ILoggingService log, SettingsService settings)
     {
         _paths = paths;
         _converter = converter;
         _log = log;
+        _settings = settings;
 
         SelectSourceCommand = new Command(async () => await SafeExecute(SelectSource));
         SelectDestCommand = new Command(async () => await SafeExecute(SelectDest));
         ConvertCommand = new Command(async () => await SafeExecute(ConvertFiles));
         OpenOutputFolderCommand = new Command(OpenOutputFolder);
+
+        // Cargar rutas guardadas desde Home
+        LoadSavedPaths();
+    }
+
+    private void LoadSavedPaths()
+    {
+        var savedSource = _settings.SourceFolder;
+        if (!string.IsNullOrEmpty(savedSource))
+        {
+            _sourceFolder = savedSource;
+            OnPropertyChanged(nameof(SourceFolder));
+            LoadFiles();
+        }
+
+        var savedDest = _settings.DestinationFolder;
+        if (!string.IsNullOrEmpty(savedDest))
+        {
+            _destFolder = savedDest;
+            OnPropertyChanged(nameof(DestFolder));
+        }
     }
 
     private async Task SelectSource()
     {
         var path = await _paths.SelectFolderAsync();
-        if (path != null) SourceFolder = path;
+        if (path != null)
+        {
+            _settings.SourceFolder = path;
+            await _settings.SaveAsync();
+            SourceFolder = path;
+        }
     }
 
     private async Task SelectDest()
     {
         var path = await _paths.SelectFolderAsync();
-        if (path != null) DestFolder = path;
+        if (path != null)
+        {
+            _settings.DestinationFolder = path;
+            await _settings.SaveAsync();
+            DestFolder = path;
+        }
     }
 
     private void LoadFiles()
@@ -112,28 +143,19 @@ public class ConvertViewModel : BindableObject
             return;
         }
 
-        string outputFolder = DestFolder;
+        // Configurar el converter para que reporte progreso
+        var progressConverter = new ConverterService(
+            log: msg => _log.Log(msg),
+            setStatus: msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
+        );
 
-        // Verificar si la implementación concreta ofrece los métodos extra
-        if (_paths is PathsServiceAndroid androidPaths)
-        {
-            if (!androidPaths.IsFolderWritable(DestFolder))
-            {
-                outputFolder = androidPaths.SafeOutputFolder;
-                Status = "Destino no escribible, se usará carpeta interna.";
-            }
-        }
-        else
-        {
-            // Si no es la versión Android, confiamos en que la carpeta sea válida
-        }
+        _actualOutputFolder = DestFolder;
 
-        _actualOutputFolder = outputFolder;
-
+        Status = "Convirtiendo...";
         try
         {
-            await _converter.ConvertFolderAsync(SourceFolder, outputFolder);
-            Status = $"Conversión completada. Archivos en: {outputFolder}";
+            await progressConverter.ConvertFolderAsync(SourceFolder, DestFolder);
+            Status = $"Conversión completada. Archivos en: {DestFolder}";
         }
         catch (Exception ex)
         {
@@ -143,14 +165,10 @@ public class ConvertViewModel : BindableObject
 
     private void OpenOutputFolder()
     {
-        if (!string.IsNullOrEmpty(_actualOutputFolder) && _paths is PathsServiceAndroid androidPaths)
-        {
-            androidPaths.OpenFolder(_actualOutputFolder);
-        }
+        if (!string.IsNullOrEmpty(_actualOutputFolder))
+            _paths.OpenFolder(_actualOutputFolder);
         else
-        {
-            Status = "No se puede abrir la carpeta (solo en Android).";
-        }
+            Status = "Primero realiza una conversión.";
     }
 
     private async Task SafeExecute(Func<Task> action)
