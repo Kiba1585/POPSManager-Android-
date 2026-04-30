@@ -1,5 +1,6 @@
 using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
+using Microsoft.Maui.Storage;   // para FileSystem
 using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Maui;
 using POPSManager.Core.Services;
@@ -23,22 +24,27 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .UseMauiCommunityToolkit();
 
-        // 🔹 Servicios del Core – interfaces y clases concretas
+        // 🔹 Servicios del Core
         builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
         builder.Services.AddSingleton<LoggingService>();
 
-        // ConverterService con delegados para progreso (se configurarán en ConvertViewModel)
+        // SettingsService con carpeta real de la app
+        builder.Services.AddSingleton<SettingsService>(sp =>
+            new SettingsService(FileSystem.AppDataDirectory));
+
+        // ConverterService
         builder.Services.AddSingleton<ConverterService>(sp =>
             new ConverterService(null, null));
 
         builder.Services.AddSingleton<NotificationService>();
-        builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<LocalizationService>();
 
+        // Automation
         builder.Services.AddSingleton<AutomationSettings>();
         builder.Services.AddSingleton<AutomationEngine>();
 
+        // Cheats
         builder.Services.AddSingleton<CheatSettingsService>(sp =>
         {
             var paths = sp.GetRequiredService<IPathsService>();
