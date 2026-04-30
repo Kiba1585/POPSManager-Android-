@@ -28,7 +28,6 @@ public partial class ProcessPopsPage : ContentPage
         {
             _lastError = ex.ToString();
 
-            // Editor para mostrar el error con posibilidad de seleccionar y copiar
             var errorEditor = new Editor
             {
                 Text = _lastError,
