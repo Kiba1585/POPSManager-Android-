@@ -25,13 +25,11 @@ public static class MauiProgram
 
         // 🔹 Servicios del Core – interfaces y clases concretas
 
-        // Paths y Logging
+        // Paths → única implementación para Android
         builder.Services.AddSingleton<IPathsService, PathsServiceAndroid>();
+        // Logging
         builder.Services.AddSingleton<ILoggingService, LoggingService>();
         builder.Services.AddSingleton<LoggingService>();
-
-        // PathsService concreto por si alguna clase lo requiere directamente
-        builder.Services.AddSingleton<PathsService>();
 
         // ConverterService sin delegados
         builder.Services.AddSingleton<ConverterService>(sp =>
@@ -42,22 +40,20 @@ public static class MauiProgram
         builder.Services.AddSingleton<SettingsService>();
         builder.Services.AddSingleton<LocalizationService>();
 
-        // Automation y sus dependencias
+        // Automation
         builder.Services.AddSingleton<AutomationSettings>();
         builder.Services.AddSingleton<AutomationEngine>();
 
-        // Cheats → requiere string (rootFolder) y Action<string>? (log)
+        // Cheats → factoría con rootFolder y log
         builder.Services.AddSingleton<CheatSettingsService>(sp =>
         {
             var paths = sp.GetRequiredService<IPathsService>();
             var log = sp.GetRequiredService<ILoggingService>();
-            // Usamos la misma raíz que PathsServiceAndroid
             return new CheatSettingsService(paths.RootFolder, msg => log.Log(msg));
         });
-
         builder.Services.AddSingleton<CheatManagerService>();
 
-        // GameProcessor
+        // GameProcessor (ya no necesita PathsService concreto)
         builder.Services.AddSingleton<GameProcessor>();
 
         // 🔹 ViewModels
