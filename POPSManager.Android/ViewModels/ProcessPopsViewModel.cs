@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
 using POPSManager.Core.Logic.Covers;
@@ -17,24 +18,27 @@ public class ProcessPopsViewModel : BindableObject
     private readonly ILoggingService _log;
     private readonly SettingsService _settings;
 
-    // Colecciones de juegos (ahora con nombre visible)
+    // Juegos con toda la información necesaria
     public ObservableCollection<GameEntry> Ps1Games { get; } = new();
     public ObservableCollection<GameEntry> Ps2Games { get; } = new();
     public ObservableCollection<GameEntry> AppsGames { get; } = new();
 
     public class GameEntry
     {
-        public string Id { get; set; } = "";
+        public string GameId { get; set; } = "";
         public string Name { get; set; } = "";
-        public string Path { get; set; } = "";
+        public string FolderPath { get; set; } = ""; // para PS1: la carpeta POPS/<juego>
+        public string VcdPath { get; set; } = "";      // ruta al .VCD (si existe)
+        public bool IsMultiDisc { get; set; }
+        public int DiscNumber { get; set; } = 1;
         public override string ToString() => Name;
     }
 
-    // Opciones de cheats (bindable)
-    private bool _cheatWidescreen = false;
-    private bool _cheatForcePal60 = false;
-    private bool _cheatFixSound = false;
-    private bool _cheatFixGraphics = false;
+    // Opciones de cheats
+    private bool _cheatWidescreen;
+    private bool _cheatForcePal60;
+    private bool _cheatFixSound;
+    private bool _cheatFixGraphics;
 
     public bool CheatWidescreen { get => _cheatWidescreen; set => SetProperty(ref _cheatWidescreen, value); }
     public bool CheatForcePal60 { get => _cheatForcePal60; set => SetProperty(ref _cheatForcePal60, value); }
@@ -48,7 +52,7 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand ProcessAllCommand { get; }
     public ICommand GenerateElfCommand { get; }
     public ICommand GenerateCheatsCommand { get; }
-    public ICommand DownloadCoversCommand { get; }
+    public ICommand DownloadCoversAndMetadataCommand { get; }   // unifica covers + metadatos
     public ICommand RefreshCommand { get; }
 
     public string OplRootFolder { get => _oplRootFolder; set => SetProperty(ref _oplRootFolder, value); }
@@ -64,7 +68,7 @@ public class ProcessPopsViewModel : BindableObject
         ProcessAllCommand = new Command(async () => await ProcessAllGames());
         GenerateElfCommand = new Command(async () => await GenerateAllElfs());
         GenerateCheatsCommand = new Command(async () => await GenerateAllCheats());
-        DownloadCoversCommand = new Command(async () => await DownloadAllCovers());
+        DownloadCoversAndMetadataCommand = new Command(async () => await DownloadAllCoversAndMetadata());
         RefreshCommand = new Command(RefreshGameLists);
 
         RefreshFromSettings();
@@ -81,7 +85,6 @@ public class ProcessPopsViewModel : BindableObject
                 OnPropertyChanged(nameof(OplRootFolder));
                 if (_paths is PathsServiceAndroid androidPaths) androidPaths.RootFolder = savedRoot;
             }
-            Status = $"Raíz OPL: {savedRoot}";
             RefreshGameLists();
         }
         else Status = "Selecciona la carpeta raíz OPL (desde Inicio o aquí).";
@@ -109,34 +112,119 @@ public class ProcessPopsViewModel : BindableObject
         try
         {
             if (Directory.Exists(_paths.PopsFolder))
+            {
                 foreach (var dir in Directory.GetDirectories(_paths.PopsFolder))
-                    Ps1Games.Add(new GameEntry { Name = Path.GetFileName(dir), Path = dir, Id = ExtractGameId(dir) });
-
+                {
+                    var entry = BuildPs1Entry(dir);
+                    Ps1Games.Add(entry);
+                }
+            }
             if (Directory.Exists(_paths.DvdFolder))
+            {
                 foreach (var file in Directory.GetFiles(_paths.DvdFolder, "*.ISO"))
-                    Ps2Games.Add(new GameEntry { Name = Path.GetFileNameWithoutExtension(file), Path = file, Id = ExtractGameId(file) });
-
+                {
+                    Ps2Games.Add(new GameEntry
+                    {
+                        Name = Path.GetFileNameWithoutExtension(file),
+                        FolderPath = file,
+                        GameId = ExtractGameId(file),
+                    });
+                }
+            }
             if (Directory.Exists(_paths.AppsFolder))
+            {
                 foreach (var file in Directory.GetFiles(_paths.AppsFolder, "*.ELF"))
-                    AppsGames.Add(new GameEntry { Name = Path.GetFileNameWithoutExtension(file), Path = file, Id = ExtractGameId(file) });
-
+                {
+                    AppsGames.Add(new GameEntry
+                    {
+                        Name = Path.GetFileNameWithoutExtension(file),
+                        FolderPath = file,
+                        GameId = ExtractGameId(file),
+                    });
+                }
+            }
             Status = $"Juegos: {Ps1Games.Count} PS1, {Ps2Games.Count} PS2, {AppsGames.Count} APPs";
         }
         catch (Exception ex) { Status = $"Error al listar: {ex.Message}"; }
     }
 
+    private GameEntry BuildPs1Entry(string discFolder)
+    {
+        // Detectar multidisco y número de disco a partir del nombre de carpeta
+        string folderName = Path.GetFileName(discFolder);
+        var discs = Directory.Exists(Path.GetDirectoryName(discFolder))
+            ? Directory.GetFiles(Path.GetDirectoryName(discFolder)!, "DISCS.TXT").Any() ? true : false
+            : false;
+
+        int discNumber = 1;
+        if (discs)
+        {
+            // Intentar extraer número de disco del nombre (CD1, DISC1, etc.)
+            var name = folderName.ToUpper();
+            if (name.Contains("CD2") || name.Contains("DISC2")) discNumber = 2;
+            else if (name.Contains("CD3") || name.Contains("DISC3")) discNumber = 3;
+            else if (name.Contains("CD4") || name.Contains("DISC4")) discNumber = 4;
+            // si no coincide, asumimos 1
+        }
+
+        string vcd = Directory.GetFiles(discFolder, "*.VCD").FirstOrDefault();
+        string gameId = ExtractGameId(discFolder);
+
+        // Nombre limpio para OPL: solo título, sin Game ID, y con disco si multidisco
+        string cleanTitle = NormalizeGameTitle(folderName, discNumber, true);
+
+        return new GameEntry
+        {
+            Name = cleanTitle,
+            FolderPath = discFolder,
+            VcdPath = vcd ?? "",
+            GameId = gameId,
+            IsMultiDisc = discs,
+            DiscNumber = discNumber,
+        };
+    }
+
+    private string NormalizeGameTitle(string rawName, int discNumber, bool includeDiscIfMulti)
+    {
+        // Eliminar prefijos tipo "SLES-12345 - "
+        string title = rawName;
+        int dashIndex = title.IndexOf(" - ");
+        if (dashIndex > 0) title = title.Substring(dashIndex + 3).Trim();
+        else
+        {
+            // Si no hay patrón, quitar cualquier Game ID al inicio
+            var parts = title.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1 && parts[0].Length >= 4 && parts[0].Contains("-")) // tipo SLES-xxxxx
+                title = parts[1];
+        }
+
+        // Añadir número de disco si es multidisco
+        if (includeDiscIfMulti && discNumber > 1)
+            title += $" (CD{discNumber})";
+
+        return title.Trim();
+    }
+
     private string ExtractGameId(string path)
     {
-        // Intentar usar el detector de IDs del Core; en su defecto usamos el nombre.
-        try { return GameIdDetector.GetGameIdFromPath(path) ?? Path.GetFileNameWithoutExtension(path); }
-        catch { return Path.GetFileNameWithoutExtension(path); }
+        try
+        {
+            var id = GameIdDetector.GetGameIdFromPath(path);
+            if (!string.IsNullOrWhiteSpace(id)) return id;
+        }
+        catch { }
+        // fallback: usar el primer token del nombre de carpeta (antes de " - ")
+        string dirName = Path.GetFileName(path);
+        int idx = dirName.IndexOf(" - ");
+        if (idx > 0 && dirName.Length >= 4) return dirName.Substring(0, idx).Trim();
+        return dirName;
     }
 
     private async Task ProcessAllGames()
     {
         await GenerateAllElfs();
         await GenerateAllCheats();
-        await DownloadAllCovers();
+        await DownloadAllCoversAndMetadata();
         Status = "Procesamiento completo.";
     }
 
@@ -152,16 +240,22 @@ public class ProcessPopsViewModel : BindableObject
 
         foreach (var game in Ps1Games)
         {
-            string vcd = Directory.GetFiles(game.Path, "*.VCD").FirstOrDefault();
-            if (vcd == null)
+            if (string.IsNullOrEmpty(game.VcdPath))
             {
-                _log.Log($"[ELF] No se encontró VCD en {game.Name}");
+                _log.Log($"[ELF] No se encontró VCD en {game.FolderPath}");
                 continue;
             }
-            // El GameIdDetector puede devolver el ID real; si no, usamos el extraído
-            string gameId = ExtractGameId(game.Path);
-            string cleanTitle = game.Name; // podríamos limpiarlo más
-            ElfGenerator.GeneratePs1Elf(baseElf, vcd, _paths.AppsFolder, 1, cleanTitle, gameId, msg => _log.Log(msg));
+
+            string appsFolder = _paths.AppsFolder;
+            string outputTitle = game.Name; // ya incluye disco si multidisco (CD2, etc.)
+            bool success = ElfGenerator.GeneratePs1Elf(
+                baseElf,
+                game.VcdPath,
+                appsFolder,
+                game.DiscNumber,
+                outputTitle,
+                game.GameId,
+                msg => _log.Log(msg));
         }
         Status = "ELFs generados.";
     }
@@ -170,32 +264,34 @@ public class ProcessPopsViewModel : BindableObject
     {
         Status = "Generando cheats...";
         var extraLines = new List<string>();
-        if (CheatWidescreen) extraLines.Add("WIDESCREEN=ON");
-        if (CheatForcePal60) extraLines.Add("FORCEVIDEO=1");
-        if (CheatFixSound) extraLines.Add("FIXSOUND=ON");
-        if (CheatFixGraphics) extraLines.Add("FIXGRAPHICS=ON");
+        if (_cheatWidescreen) extraLines.Add("WIDESCREEN=ON");
+        if (_cheatForcePal60) extraLines.Add("FORCEVIDEO=1");
+        if (_cheatFixSound) extraLines.Add("FIXSOUND=ON");
+        if (_cheatFixGraphics) extraLines.Add("FIXGRAPHICS=ON");
 
         foreach (var game in Ps1Games)
         {
-            string gameId = ExtractGameId(game.Path);
-            CheatGenerator.GenerateCheatTxt(gameId, game.Path, extraLines, msg => _log.Log(msg));
+            CheatGenerator.GenerateCheatTxt(game.GameId, game.FolderPath, extraLines, msg => _log.Log(msg));
         }
         Status = "Cheats generados.";
     }
 
-    private async Task DownloadAllCovers()
+    private async Task DownloadAllCoversAndMetadata()
     {
-        Status = "Descargando covers...";
+        Status = "Descargando covers y metadatos...";
         foreach (var game in Ps1Games.Concat(Ps2Games))
         {
-            string gameId = game.Id;
-            string? coverUrl = GameDatabase.TryGetCoverUrl(gameId); // Método a implementar en GameDatabase
+            // Covers
+            string? coverUrl = null; // <-- Aquí conectarás con GameDatabase.TryGetCoverUrl(game.GameId)
             if (coverUrl != null)
-                await ArtDownloader.DownloadArtAsync(gameId, coverUrl, _paths.ArtFolder, msg => _log.Log(msg));
+                await ArtDownloader.DownloadArtAsync(game.GameId, coverUrl, _paths.ArtFolder, msg => _log.Log(msg));
             else
-                _log.Log($"[COVER] Sin URL para {gameId}");
+                _log.Log($"[COVER] Sin URL para {game.GameId}");
+
+            // Metadatos
+            await MetadataDownloader.DownloadMetadataAsync(game.GameId, game.Name, _paths.CfgFolder, msg => _log.Log(msg));
         }
-        Status = "Covers actualizados.";
+        Status = "Covers y metadatos actualizados.";
     }
 
     protected bool SetProperty<T>(ref T backingStore, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
