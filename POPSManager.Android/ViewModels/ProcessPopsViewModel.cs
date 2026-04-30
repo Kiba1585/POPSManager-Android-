@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
@@ -43,16 +44,31 @@ public class ProcessPopsViewModel : BindableObject
 
     private async Task SelectFolder()
     {
-        _selectedFolder = await _paths.SelectFolderAsync();
-        CanProcess = !string.IsNullOrEmpty(_selectedFolder);
-        Status = _selectedFolder ?? "No se seleccionó carpeta.";
+        try
+        {
+            _selectedFolder = await _paths.SelectFolderAsync();
+            CanProcess = !string.IsNullOrEmpty(_selectedFolder);
+            Status = _selectedFolder ?? "No se seleccionó carpeta.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error al seleccionar carpeta: {ex.Message}";
+        }
     }
 
     private async Task ProcessGames()
     {
         if (_selectedFolder == null) return;
+
         Status = "Procesando...";
-        await _processor.ProcessFolderAsync(_selectedFolder);
-        Status = "Procesamiento completado.";
+        try
+        {
+            await _processor.ProcessFolderAsync(_selectedFolder);
+            Status = "Procesamiento completado.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error durante el procesamiento: {ex.Message}";
+        }
     }
 }
