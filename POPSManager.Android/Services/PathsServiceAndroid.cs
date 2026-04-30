@@ -3,7 +3,6 @@ using AndroidX.Core.Content;
 using CommunityToolkit.Maui.Storage;
 using POPSManager.Core.Services;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using AndroidUri = Android.Net.Uri;
@@ -33,7 +32,6 @@ public class PathsServiceAndroid : IPathsService
     public string ArtFolder => Path.Combine(RootFolder, "ART");
     public string DvdFolder => Path.Combine(RootFolder, "DVD");
 
-    // POPSTARTER.ELF se deriva automáticamente de la raíz OPL, pero la interfaz necesita set
     public string PopstarterElfPath
     {
         get => Path.Combine(RootFolder, "POPSTARTER.ELF");
@@ -106,36 +104,42 @@ public class PathsServiceAndroid : IPathsService
         try
         {
             var context = global::Android.App.Application.Context;
-            var packageManager = context.PackageManager;
-            if (packageManager is null) return;
 
-            var androidUri = AndroidX.Core.Content.FileProvider.GetUriForFile(
-                context,
-                context.PackageName + ".fileprovider",
-                new Java.IO.File(folderPath));
-
-            var intent = new Intent(Intent.ActionView);
-            intent.SetDataAndType(androidUri, "resource/folder");
+            // Usar Storage Access Framework para abrir la carpeta
+            var intent = new Intent(Intent.ActionOpenDocumentTree);
             intent.AddFlags(ActivityFlags.GrantReadUriPermission);
             intent.AddFlags(ActivityFlags.NewTask);
 
-            if (intent.ResolveActivity(packageManager) == null)
+            // Convertir la ruta a una URI de contenido (Android 11+)
+            if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R)
             {
-                var docUri = AndroidUri.Parse(
-                    "content://com.android.externalstorage.documents/tree/" +
-                    folderPath.Replace("/storage/emulated/0/", "primary%3A"));
-                intent.SetDataAndType(docUri, "resource/folder");
+                var uri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/primary%3A" +
+                    folderPath.Replace("/storage/emulated/0/", "").Replace("/", "%2F"));
+                intent.PutExtra("android.provider.extra.INITIAL_URI", uri);
             }
 
             context.StartActivity(intent);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine("No se pudo abrir la carpeta: " + ex.Message);
+            // Fallback: intentar con un intent genérico
+            try
+            {
+                var intent = new Intent(Intent.ActionView);
+                var uri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/" +
+                    folderPath.Replace("/storage/emulated/0/", "primary%3A"));
+                intent.SetDataAndType(uri, "resource/folder");
+                intent.AddFlags(ActivityFlags.GrantReadUriPermission);
+                intent.AddFlags(ActivityFlags.NewTask);
+                global::Android.App.Application.Context.StartActivity(intent);
+            }
+            catch (Exception fallbackEx)
+            {
+                System.Diagnostics.Debug.WriteLine("No se pudo abrir la carpeta: " + fallbackEx.Message);
+            }
         }
     }
 
-    // Cumplen con la interfaz
-    public void SetElfPath(string path) => PopstarterElfPath = path;   // set vacío
+    public void SetElfPath(string path) => PopstarterElfPath = path;
     public void SetPs2ElfPath(string path) => PopstarterPs2ElfPath = path;
 }
