@@ -11,10 +11,13 @@ public interface IPathsService
     string PopstarterElfPath { get; set; }
     string PopstarterPs2ElfPath { get; set; }
     string TempFolder { get; }
-    
+
     Task<string?> SelectFolderAsync();
     Task<string?> SelectFileAsync(string filter);
-    
+
     void SetElfPath(string path);
     void SetPs2ElfPath(string path);
+
+    /// <summary>Abre una carpeta con un explorador de archivos.</summary>
+    void OpenFolder(string folderPath);
 }
