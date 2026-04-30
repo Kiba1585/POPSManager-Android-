@@ -12,32 +12,30 @@
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Rutas de trabajo" FontSize="18" FontAttributes="Bold" TextColor="White" />
 
-                    <Label Text="Carpeta de origen:" FontSize="14" TextColor="#CCCCCC" />
+                    <!-- Carpeta de origen -->
+                    <Label Text="Carpeta de origen (juegos BIN/ISO):" FontSize="14" TextColor="#CCCCCC" />
                     <Entry Text="{Binding SourcePath}" Placeholder="Ruta de origen" BackgroundColor="#3A3A3A" TextColor="White" />
-                    <Button Text="Seleccionar" Command="{Binding ChangeSourceFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+                    <Button Text="Seleccionar carpeta de origen" Command="{Binding ChangeSourceFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
 
-                    <Label Text="Carpeta de destino:" FontSize="14" TextColor="#CCCCCC" />
+                    <!-- Carpeta de destino (raíz OPL) -->
+                    <Label Text="Carpeta de destino (raíz OPL):" FontSize="14" TextColor="#CCCCCC" />
                     <Entry Text="{Binding DestinationPath}" Placeholder="Ruta de destino" BackgroundColor="#3A3A3A" TextColor="White" />
-                    <Button Text="Seleccionar" Command="{Binding ChangeDestinationFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+                    <Button Text="Seleccionar carpeta de destino" Command="{Binding ChangeDestinationFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
 
-                    <Label Text="Carpeta de ELFs:" FontSize="14" TextColor="#CCCCCC" />
-                    <Entry Text="{Binding ElfFolderPath}" Placeholder="Ruta de ELFs" BackgroundColor="#3A3A3A" TextColor="White" />
-                    <Button Text="Seleccionar" Command="{Binding ChangeElfFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
-
+                    <!-- Procesar subcarpetas -->
                     <HorizontalStackLayout Spacing="10">
                         <CheckBox IsChecked="{Binding ProcessSubfolders}" Color="White" />
-                        <Label Text="Procesar subcarpetas" VerticalOptions="Center" TextColor="White" />
+                        <Label Text="Procesar subcarpetas recursivamente" VerticalOptions="Center" TextColor="White" />
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
             </Frame>
 
             <!-- Acciones rápidas -->
             <Label Text="Acciones rápidas" FontSize="20" FontAttributes="Bold" TextColor="White" />
-            <FlexLayout Wrap="Wrap" JustifyContent="Start">
-                <Button Text="Convertir" Command="{Binding OpenConvertCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
-                <Button Text="Procesar" Command="{Binding OpenProcessPopsCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
-                <Button Text="Abrir raíz" Command="{Binding OpenRootFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
-                <Button Text="Abrir ELF" Command="{Binding OpenElfFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
+            <FlexLayout Wrap="Wrap" JustifyContent="Start" AlignItems="Center">
+                <Button Text="Convertir juegos" Command="{Binding OpenConvertCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+                <Button Text="Procesar juegos" Command="{Binding OpenProcessPopsCommand}" BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+                <Button Text="Abrir carpeta raíz" Command="{Binding OpenRootFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
             </FlexLayout>
 
             <!-- Información del sistema -->
