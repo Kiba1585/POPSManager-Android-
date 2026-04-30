@@ -11,14 +11,32 @@ namespace POPSManager.Android.Services;
 
 public class PathsServiceAndroid : IPathsService
 {
-    public string RootFolder { get; set; } = "/storage/emulated/0/POPSManager";
+    private string _rootFolder = "/storage/emulated/0/POPSManager";
+
+    public string RootFolder
+    {
+        get => _rootFolder;
+        set
+        {
+            if (_rootFolder != value)
+            {
+                _rootFolder = value;
+                // Al cambiar la raíz, aseguramos que las carpetas existan
+                EnsureOplFoldersExist();
+            }
+        }
+    }
+
     public string PopsFolder => Path.Combine(RootFolder, "POPS");
     public string AppsFolder => Path.Combine(RootFolder, "APPS");
     public string CfgFolder => Path.Combine(RootFolder, "CFG");
     public string ArtFolder => Path.Combine(RootFolder, "ART");
     public string DvdFolder => Path.Combine(RootFolder, "DVD");
-    public string PopstarterElfPath { get; set; } = "";
+
+    // POPSTARTER.ELF base se espera en la raíz OPL
+    public string PopstarterElfPath => Path.Combine(RootFolder, "POPSTARTER.ELF");
     public string PopstarterPs2ElfPath { get; set; } = "";
+
     public string TempFolder => FileSystem.CacheDirectory;
     public string SafeOutputFolder => Path.Combine(FileSystem.AppDataDirectory, "Output");
 
@@ -41,9 +59,6 @@ public class PathsServiceAndroid : IPathsService
         return result?.FullPath;
     }
 
-    /// <summary>
-    /// Crea todas las carpetas necesarias para el OPL dentro de la raíz especificada.
-    /// </summary>
     public void EnsureOplFoldersExist()
     {
         try
@@ -54,6 +69,7 @@ public class PathsServiceAndroid : IPathsService
             Directory.CreateDirectory(CfgFolder);
             Directory.CreateDirectory(ArtFolder);
             Directory.CreateDirectory(AppsFolder);
+            System.Diagnostics.Debug.WriteLine($"Carpetas OPL creadas bajo {RootFolder}");
         }
         catch (Exception ex)
         {
@@ -116,6 +132,7 @@ public class PathsServiceAndroid : IPathsService
         }
     }
 
-    public void SetElfPath(string path) => PopstarterElfPath = path;
+    // Ya no se necesitan SetElfPath ni SetPs2ElfPath, pero se mantienen por la interfaz
+    public void SetElfPath(string path) { /* ignorado, automático */ }
     public void SetPs2ElfPath(string path) => PopstarterPs2ElfPath = path;
 }
