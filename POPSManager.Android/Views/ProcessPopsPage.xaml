@@ -16,7 +16,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="15">
 
-            <!-- ====== Carpeta raíz OPL ====== -->
+            <!-- Carpeta raíz OPL -->
             <Label Text="Carpeta raíz OPL:"
                    FontSize="14"
                    TextColor="#CCCCCC" />
@@ -29,7 +29,7 @@
                     BackgroundColor="#4CC2FF"
                     TextColor="White" />
 
-            <!-- ====== Opciones de cheats ====== -->
+            <!-- Opciones de cheats -->
             <Frame BackgroundColor="#2D2D2D"
                    Padding="10"
                    CornerRadius="10">
@@ -68,7 +68,7 @@
                 </VerticalStackLayout>
             </Frame>
 
-            <!-- ====== Acciones ====== -->
+            <!-- Acciones -->
             <Label Text="Acciones"
                    FontSize="20"
                    FontAttributes="Bold"
@@ -95,6 +95,11 @@
                         BackgroundColor="#4CC2FF"
                         TextColor="White"
                         Margin="0,0,10,10" />
+                <Button Text="Renombrar juegos"
+                        Command="{Binding RenameAllCommand}"
+                        BackgroundColor="#2D2D2D"
+                        TextColor="White"
+                        Margin="0,0,10,10" />
                 <Button Text="Refrescar listas"
                         Command="{Binding RefreshCommand}"
                         BackgroundColor="#2D2D2D"
@@ -102,12 +107,12 @@
                         Margin="0,0,10,10" />
             </FlexLayout>
 
-            <!-- ====== Estado ====== -->
+            <!-- Estado -->
             <Label Text="{Binding Status}"
                    FontSize="14"
                    TextColor="#CCCCCC" />
 
-            <!-- ====== Listas de juegos ====== -->
+            <!-- Listas de juegos -->
             <Label Text="PS1 Games"
                    FontSize="18"
                    FontAttributes="Bold"
