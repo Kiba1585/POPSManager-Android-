@@ -12,6 +12,29 @@
             <Entry Text="{Binding OplRootFolder}" Placeholder="Ruta de la raíz OPL" BackgroundColor="#2D2D2D" TextColor="White" />
             <Button Text="Seleccionar raíz OPL" Command="{Binding SelectOplRootFolderCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
 
+            <!-- Opciones de cheats -->
+            <Frame BackgroundColor="#2D2D2D" Padding="10" CornerRadius="10">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Opciones de cheats" FontAttributes="Bold" TextColor="White" />
+                    <HorizontalStackLayout Spacing="10">
+                        <Switch IsToggled="{Binding CheatWidescreen}" />
+                        <Label Text="Widescreen" TextColor="White" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="10">
+                        <Switch IsToggled="{Binding CheatForcePal60}" />
+                        <Label Text="Forzar PAL60" TextColor="White" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="10">
+                        <Switch IsToggled="{Binding CheatFixSound}" />
+                        <Label Text="Arreglar sonido" TextColor="White" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="10">
+                        <Switch IsToggled="{Binding CheatFixGraphics}" />
+                        <Label Text="Arreglar gráficos" TextColor="White" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
             <!-- Acciones -->
             <Label Text="Acciones" FontSize="20" FontAttributes="Bold" TextColor="White" />
             <FlexLayout Wrap="Wrap" JustifyContent="Start">
@@ -27,13 +50,13 @@
 
             <!-- Listas de juegos -->
             <Label Text="PS1 Games" FontSize="18" FontAttributes="Bold" TextColor="White" />
-            <CollectionView ItemsSource="{Binding Ps1Games}" />
+            <CollectionView ItemsSource="{Binding Ps1Games}" ItemTemplate="{StaticResource GameListTemplate}" />
 
             <Label Text="PS2 Games" FontSize="18" FontAttributes="Bold" TextColor="White" />
-            <CollectionView ItemsSource="{Binding Ps2Games}" />
+            <CollectionView ItemsSource="{Binding Ps2Games}" ItemTemplate="{StaticResource GameListTemplate}" />
 
             <Label Text="APPs" FontSize="18" FontAttributes="Bold" TextColor="White" />
-            <CollectionView ItemsSource="{Binding AppsGames}" />
+            <CollectionView ItemsSource="{Binding AppsGames}" ItemTemplate="{StaticResource GameListTemplate}" />
 
         </VerticalStackLayout>
     </ScrollView>
