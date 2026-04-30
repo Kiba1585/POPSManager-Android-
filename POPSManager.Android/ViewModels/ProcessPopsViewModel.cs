@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
@@ -50,18 +51,31 @@ public class ProcessPopsViewModel : BindableObject
         DownloadCoversCommand = new Command(async () => await DownloadAllCovers());
         RefreshCommand = new Command(RefreshGameLists);
 
-        // Cargar carpeta raíz OPL desde los ajustes guardados en Inicio
-        LoadOplRootFolder();
+        // Carga inicial
+        RefreshFromSettings();
     }
 
-    private void LoadOplRootFolder()
+    /// <summary>
+    /// Refresca la raíz OPL desde los ajustes guardados en Inicio/Convertir.
+    /// Se llama desde OnAppearing de la página.
+    /// </summary>
+    public void RefreshFromSettings()
     {
         var savedRoot = _settings.DestinationFolder;
         if (!string.IsNullOrEmpty(savedRoot))
         {
-            _oplRootFolder = savedRoot;
-            if (_paths is PathsServiceAndroid androidPaths)
-                androidPaths.RootFolder = savedRoot;
+            if (savedRoot != _oplRootFolder)
+            {
+                _oplRootFolder = savedRoot;
+                OnPropertyChanged(nameof(OplRootFolder));
+
+                // Sincronizar con la implementación Android
+                if (_paths is PathsServiceAndroid androidPaths)
+                {
+                    androidPaths.RootFolder = savedRoot;
+                    androidPaths.EnsureOplFoldersExist();
+                }
+            }
             Status = $"Raíz OPL: {savedRoot}";
             RefreshGameLists();
         }
@@ -81,10 +95,14 @@ public class ProcessPopsViewModel : BindableObject
                 _settings.DestinationFolder = path;
                 _settings.RootFolder = path;
                 await _settings.SaveAsync();
+
                 OplRootFolder = path;
 
                 if (_paths is PathsServiceAndroid androidPaths)
+                {
                     androidPaths.RootFolder = path;
+                    androidPaths.EnsureOplFoldersExist();
+                }
 
                 RefreshGameLists();
             }
@@ -108,17 +126,20 @@ public class ProcessPopsViewModel : BindableObject
                 foreach (var dir in Directory.GetDirectories(_paths.PopsFolder))
                     Ps1Games.Add(Path.GetFileName(dir));
             }
+
             if (Directory.Exists(_paths.DvdFolder))
             {
                 foreach (var file in Directory.GetFiles(_paths.DvdFolder, "*.ISO"))
                     Ps2Games.Add(Path.GetFileNameWithoutExtension(file));
             }
+
             if (Directory.Exists(_paths.AppsFolder))
             {
                 foreach (var file in Directory.GetFiles(_paths.AppsFolder, "*.ELF"))
                     AppsGames.Add(Path.GetFileNameWithoutExtension(file));
             }
-            Status = $"Juegos cargados: {Ps1Games.Count} PS1, {Ps2Games.Count} PS2, {AppsGames.Count} APPs";
+
+            Status = $"Juegos: {Ps1Games.Count} PS1, {Ps2Games.Count} PS2, {AppsGames.Count} APPs";
         }
         catch (Exception ex)
         {
