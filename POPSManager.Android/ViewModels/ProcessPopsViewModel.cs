@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
+using POPSManager.Core.Logic.Covers;       // ← Necesario para ArtResizer
 using POPSManager.Core.Services;
 using POPSManager.Android.Services;
 
@@ -206,6 +207,7 @@ public class ProcessPopsViewModel : BindableObject
         if (!File.Exists(baseElf))
         {
             Status = $"POPSTARTER.ELF no encontrado.{Environment.NewLine}Cópialo a la raíz de la carpeta destino.";
+            await Task.CompletedTask;   // Elimina warning
             return;
         }
 
@@ -228,6 +230,7 @@ public class ProcessPopsViewModel : BindableObject
             count++;
         }
         Status = count > 0 ? $"{count} ELFs generados." : "No se generaron ELFs (sin VCDs).";
+        await Task.CompletedTask;       // Elimina warning
     }
 
     private async Task GenerateAllCheats()
@@ -246,6 +249,7 @@ public class ProcessPopsViewModel : BindableObject
             count++;
         }
         Status = count > 0 ? $"{count} CHEAT.TXT generados." : "No hay juegos de PS1 para cheats.";
+        await Task.CompletedTask;       // Elimina warning
     }
 
     private async Task DownloadAllCoversAndMetadata()
@@ -257,7 +261,6 @@ public class ProcessPopsViewModel : BindableObject
             return;
         }
 
-        // Ajusta esta URL a tu mirror de OPL Manager
         string mirrorBase = "https://archive.org/download/oplm-art-2023-11";
 
         int success = 0;
@@ -280,16 +283,17 @@ public class ProcessPopsViewModel : BindableObject
         string artFile = Path.Combine(_paths.ArtFolder, gameId + ".jpg");
         if (!File.Exists(artFile))
         {
-            // Capa 1: JSON local
             string? coverUrl = GameDatabase.TryGetCoverUrl(gameId);
-            // Capa 2: mirror OPL
             if (string.IsNullOrWhiteSpace(coverUrl))
                 coverUrl = $"{mirrorBase}/ART/{gameId}.jpg";
 
             if (!string.IsNullOrWhiteSpace(coverUrl) && await DownloadFileAsync(coverUrl, artFile))
             {
-                // Convertir a .ART (SkiaSharp)
-                try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
+                try
+                {
+                    // Convertir a .ART (SkiaSharp)
+                    ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg));
+                }
                 catch { /* si falla, al menos se guardó el jpg */ }
                 anyDownloaded = true;
             }
