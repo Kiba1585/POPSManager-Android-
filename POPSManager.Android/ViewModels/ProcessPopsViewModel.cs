@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
@@ -32,7 +33,6 @@ public class ProcessPopsViewModel : BindableObject
         public override string ToString() => Name;
     }
 
-    // Opciones de cheats
     private bool _cheatWidescreen;
     private bool _cheatNoPal;
     private bool _cheatFixSound;
@@ -250,31 +250,79 @@ public class ProcessPopsViewModel : BindableObject
 
     private async Task DownloadAllCoversAndMetadata()
     {
-        // Descargar el pack completo de OPLM (covers + metadatos)
-        bool downloaded = await OplArtDownloader.DownloadAndExtractAsync(
-            _paths.RootFolder,
-            msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
-        );
-
-        if (!downloaded)
+        var allGames = Ps1Games.Concat(Ps2Games).ToList();
+        if (!allGames.Any())
         {
-            Status = "Error al descargar la base de datos. Verifica la conexión.";
+            Status = "No hay juegos para actualizar.";
             return;
         }
 
-        // Leer metadatos de ejemplo para el primer juego de PS1/PS2
-        var firstGame = Ps1Games.Concat(Ps2Games).FirstOrDefault();
-        if (firstGame != null)
+        // Ajusta esta URL a tu mirror de OPL Manager
+        string mirrorBase = "https://archive.org/download/oplm-art-2023-11";
+
+        int success = 0;
+        for (int i = 0; i < allGames.Count; i++)
         {
-            var metadata = await OplMetadataReader.GetCfgMetadataAsync(firstGame.GameId, _paths.CfgFolder);
-            if (!string.IsNullOrEmpty(metadata.Title))
+            var game = allGames[i];
+            MainThread.BeginInvokeOnMainThread(() => Status = $"{i + 1}/{allGames.Count}: {game.Name}");
+            if (await DownloadSingleGameAssetsAsync(game.GameId, mirrorBase))
+                success++;
+        }
+
+        Status = $"Descarga finalizada. {success}/{allGames.Count} juegos actualizados.";
+    }
+
+    private async Task<bool> DownloadSingleGameAssetsAsync(string gameId, string mirrorBase)
+    {
+        bool anyDownloaded = false;
+
+        // 1) Carátula
+        string artFile = Path.Combine(_paths.ArtFolder, gameId + ".jpg");
+        if (!File.Exists(artFile))
+        {
+            // Capa 1: JSON local
+            string? coverUrl = GameDatabase.TryGetCoverUrl(gameId);
+            // Capa 2: mirror OPL
+            if (string.IsNullOrWhiteSpace(coverUrl))
+                coverUrl = $"{mirrorBase}/ART/{gameId}.jpg";
+
+            if (!string.IsNullOrWhiteSpace(coverUrl) && await DownloadFileAsync(coverUrl, artFile))
             {
-                Status = $"Base actualizada. Ejemplo: {metadata.Title} ({metadata.Genre})";
+                // Convertir a .ART (SkiaSharp)
+                try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
+                catch { /* si falla, al menos se guardó el jpg */ }
+                anyDownloaded = true;
             }
         }
-        else
+
+        // 2) Metadatos (.cfg)
+        string cfgFile = Path.Combine(_paths.CfgFolder, gameId + ".cfg");
+        if (!File.Exists(cfgFile))
         {
-            Status = "Base de datos actualizada. No hay juegos para mostrar metadatos.";
+            string cfgUrl = $"{mirrorBase}/CFG/{gameId}.cfg";
+            if (await DownloadFileAsync(cfgUrl, cfgFile))
+                anyDownloaded = true;
+        }
+
+        return anyDownloaded;
+    }
+
+    private async Task<bool> DownloadFileAsync(string url, string destination)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return false;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await using var fs = new FileStream(destination, FileMode.Create);
+            await response.Content.CopyToAsync(fs);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
