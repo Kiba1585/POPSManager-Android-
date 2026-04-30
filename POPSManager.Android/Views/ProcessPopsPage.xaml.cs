@@ -69,7 +69,7 @@ public partial class ProcessPopsPage : ContentPage
             var shareButton = new Button
             {
                 Text = "Compartir error",
-                BackgroundColor = Colors.BlueGray
+                BackgroundColor = Colors.Grey
             };
             shareButton.Clicked += async (s, e) =>
             {
