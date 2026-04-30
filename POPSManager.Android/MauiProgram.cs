@@ -46,8 +46,15 @@ public static class MauiProgram
         builder.Services.AddSingleton<AutomationSettings>();
         builder.Services.AddSingleton<AutomationEngine>();
 
-        // Cheats
-        builder.Services.AddSingleton<CheatSettingsService>();
+        // Cheats → requiere string (rootFolder) y Action<string>? (log)
+        builder.Services.AddSingleton<CheatSettingsService>(sp =>
+        {
+            var paths = sp.GetRequiredService<IPathsService>();
+            var log = sp.GetRequiredService<ILoggingService>();
+            // Usamos la misma raíz que PathsServiceAndroid
+            return new CheatSettingsService(paths.RootFolder, msg => log.Log(msg));
+        });
+
         builder.Services.AddSingleton<CheatManagerService>();
 
         // GameProcessor
