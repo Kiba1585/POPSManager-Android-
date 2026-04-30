@@ -33,14 +33,14 @@ public class ProcessPopsViewModel : BindableObject
         public override string ToString() => Name;
     }
 
-    // Opciones de cheats
+    // Opciones de cheats actualizadas
     private bool _cheatWidescreen;
-    private bool _cheatForcePal60;
+    private bool _cheatNoPal;          // en lugar de ForcePal60
     private bool _cheatFixSound;
     private bool _cheatFixGraphics;
 
     public bool CheatWidescreen { get => _cheatWidescreen; set => SetProperty(ref _cheatWidescreen, value); }
-    public bool CheatForcePal60 { get => _cheatForcePal60; set => SetProperty(ref _cheatForcePal60, value); }
+    public bool CheatNoPal { get => _cheatNoPal; set => SetProperty(ref _cheatNoPal, value); }
     public bool CheatFixSound { get => _cheatFixSound; set => SetProperty(ref _cheatFixSound, value); }
     public bool CheatFixGraphics { get => _cheatFixGraphics; set => SetProperty(ref _cheatFixGraphics, value); }
 
@@ -85,6 +85,7 @@ public class ProcessPopsViewModel : BindableObject
                 if (_paths is PathsServiceAndroid androidPaths) androidPaths.RootFolder = savedRoot;
             }
             RefreshGameLists();
+            Status = $"Raíz OPL: {savedRoot}";
         }
         else Status = "Selecciona la carpeta raíz OPL (desde Inicio o aquí).";
     }
@@ -113,34 +114,17 @@ public class ProcessPopsViewModel : BindableObject
             if (Directory.Exists(_paths.PopsFolder))
             {
                 foreach (var dir in Directory.GetDirectories(_paths.PopsFolder))
-                {
-                    var entry = BuildPs1Entry(dir);
-                    Ps1Games.Add(entry);
-                }
+                    Ps1Games.Add(BuildPs1Entry(dir));
             }
             if (Directory.Exists(_paths.DvdFolder))
             {
                 foreach (var file in Directory.GetFiles(_paths.DvdFolder, "*.ISO"))
-                {
-                    Ps2Games.Add(new GameEntry
-                    {
-                        Name = Path.GetFileNameWithoutExtension(file),
-                        FolderPath = file,
-                        GameId = ExtractGameId(file),
-                    });
-                }
+                    Ps2Games.Add(new GameEntry { Name = Path.GetFileNameWithoutExtension(file), FolderPath = file, GameId = ExtractGameId(file) });
             }
             if (Directory.Exists(_paths.AppsFolder))
             {
                 foreach (var file in Directory.GetFiles(_paths.AppsFolder, "*.ELF"))
-                {
-                    AppsGames.Add(new GameEntry
-                    {
-                        Name = Path.GetFileNameWithoutExtension(file),
-                        FolderPath = file,
-                        GameId = ExtractGameId(file),
-                    });
-                }
+                    AppsGames.Add(new GameEntry { Name = Path.GetFileNameWithoutExtension(file), FolderPath = file, GameId = ExtractGameId(file) });
             }
             Status = $"Juegos: {Ps1Games.Count} PS1, {Ps2Games.Count} PS2, {AppsGames.Count} APPs";
         }
@@ -152,7 +136,6 @@ public class ProcessPopsViewModel : BindableObject
         string folderName = Path.GetFileName(discFolder);
         bool discs = Directory.Exists(Path.GetDirectoryName(discFolder))
                      && Directory.GetFiles(Path.GetDirectoryName(discFolder)!, "DISCS.TXT").Any();
-
         int discNumber = 1;
         if (discs)
         {
@@ -161,7 +144,6 @@ public class ProcessPopsViewModel : BindableObject
             else if (name.Contains("CD3") || name.Contains("DISC3")) discNumber = 3;
             else if (name.Contains("CD4") || name.Contains("DISC4")) discNumber = 4;
         }
-
         string vcd = Directory.GetFiles(discFolder, "*.VCD").FirstOrDefault() ?? "";
         string gameId = ExtractGameId(discFolder);
         string cleanTitle = NormalizeGameTitle(folderName, discNumber, true);
@@ -173,7 +155,7 @@ public class ProcessPopsViewModel : BindableObject
             VcdPath = vcd,
             GameId = gameId,
             IsMultiDisc = discs,
-            DiscNumber = discNumber,
+            DiscNumber = discNumber
         };
     }
 
@@ -188,30 +170,30 @@ public class ProcessPopsViewModel : BindableObject
             if (parts.Length > 1 && parts[0].Length >= 4 && parts[0].Contains("-"))
                 title = parts[1];
         }
-
         if (includeDiscIfMulti && discNumber > 1)
             title += $" (CD{discNumber})";
-
         return title.Trim();
     }
 
-    // ⚠️ Método corregido
     private string ExtractGameId(string path)
     {
         try
         {
-            var id = GameIdDetector.DetectGameId(path);   // ← método correcto
+            var id = GameIdDetector.DetectGameId(path);
             if (!string.IsNullOrWhiteSpace(id)) return id;
         }
         catch { }
-
-        // fallback: detectar desde el nombre de la carpeta/archivo
         string name = Path.GetFileNameWithoutExtension(path);
         return GameIdDetector.DetectFromName(name);
     }
 
     private async Task ProcessAllGames()
     {
+        if (!Ps1Games.Any() && !Ps2Games.Any())
+        {
+            Status = "No hay juegos para procesar. Revisa la carpeta POPS/DVD.";
+            return;
+        }
         await GenerateAllElfs();
         await GenerateAllCheats();
         await DownloadAllCoversAndMetadata();
@@ -222,12 +204,13 @@ public class ProcessPopsViewModel : BindableObject
     {
         Status = "Generando ELFs...";
         string baseElf = _paths.PopstarterElfPath;
-        if (string.IsNullOrEmpty(baseElf) || !File.Exists(baseElf))
+        if (!File.Exists(baseElf))
         {
-            Status = "POPSTARTER.ELF no encontrado. Configúralo en Inicio.";
+            Status = $"POPSTARTER.ELF no encontrado en {baseElf}. Cópialo a la raíz de la carpeta destino.";
             return;
         }
 
+        int count = 0;
         foreach (var game in Ps1Games)
         {
             if (string.IsNullOrEmpty(game.VcdPath))
@@ -235,7 +218,6 @@ public class ProcessPopsViewModel : BindableObject
                 _log.Log($"[ELF] No se encontró VCD en {game.FolderPath}");
                 continue;
             }
-
             ElfGenerator.GeneratePs1Elf(
                 baseElf,
                 game.VcdPath,
@@ -244,8 +226,9 @@ public class ProcessPopsViewModel : BindableObject
                 game.Name,
                 game.GameId,
                 msg => _log.Log(msg));
+            count++;
         }
-        Status = "ELFs generados.";
+        Status = count > 0 ? $"{count} ELFs generados." : "No se generaron ELFs (sin VCDs).";
     }
 
     private async Task GenerateAllCheats()
@@ -253,20 +236,23 @@ public class ProcessPopsViewModel : BindableObject
         Status = "Generando cheats...";
         var extraLines = new List<string>();
         if (_cheatWidescreen) extraLines.Add("WIDESCREEN=ON");
-        if (_cheatForcePal60) extraLines.Add("FORCEVIDEO=1");
+        if (_cheatNoPal) extraLines.Add("$NOPAL");           // antes era FORCEVIDEO=1
         if (_cheatFixSound) extraLines.Add("FIXSOUND=ON");
         if (_cheatFixGraphics) extraLines.Add("FIXGRAPHICS=ON");
 
+        int count = 0;
         foreach (var game in Ps1Games)
         {
             CheatGenerator.GenerateCheatTxt(game.GameId, game.FolderPath, extraLines, msg => _log.Log(msg));
+            count++;
         }
-        Status = "Cheats generados.";
+        Status = count > 0 ? $"{count} CHEAT.TXT generados." : "No hay juegos de PS1 para cheats.";
     }
 
     private async Task DownloadAllCoversAndMetadata()
     {
         Status = "Descargando covers y metadatos...";
+        int metaCount = 0;
         foreach (var game in Ps1Games.Concat(Ps2Games))
         {
             // Covers (placeholder hasta que haya URLs)
@@ -278,8 +264,9 @@ public class ProcessPopsViewModel : BindableObject
 
             // Metadatos
             await MetadataDownloader.DownloadMetadataAsync(game.GameId, game.Name, _paths.CfgFolder, msg => _log.Log(msg));
+            metaCount++;
         }
-        Status = "Covers y metadatos actualizados.";
+        Status = $"Covers y {metaCount} metadatos actualizados.";
     }
 
     protected bool SetProperty<T>(ref T backingStore, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
