@@ -23,5 +23,8 @@ namespace POPSManager.Core.Services
 
         public void SetElfPath(string path) => PopstarterElfPath = path;
         public void SetPs2ElfPath(string path) => PopstarterPs2ElfPath = path;
+
+        /// <summary>En la versión de escritorio no se usa; solo cumple con la interfaz.</summary>
+        public void OpenFolder(string folderPath) { /* sin acción en Core */ }
     }
 }
