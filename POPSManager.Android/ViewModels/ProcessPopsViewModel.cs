@@ -12,26 +12,29 @@ public class ProcessPopsViewModel : BindableObject
     private readonly GameProcessor _processor;
     private readonly SettingsService _settings;
 
+    private string _oplRootFolder = "";
     private string _status = "";
-    private bool _canProcess;
-    private string? _selectedFolder;
 
     public ObservableCollection<string> Ps1Games { get; } = new();
     public ObservableCollection<string> Ps2Games { get; } = new();
     public ObservableCollection<string> AppsGames { get; } = new();
 
-    public ICommand SelectFolderCommand { get; }
-    public ICommand ProcessCommand { get; }
+    public ICommand SelectOplRootFolderCommand { get; }
+    public ICommand ProcessAllCommand { get; }
+    public ICommand GenerateElfCommand { get; }
+    public ICommand GenerateCheatsCommand { get; }
+    public ICommand DownloadCoversCommand { get; }
+    public ICommand RefreshCommand { get; }
 
+    public string OplRootFolder
+    {
+        get => _oplRootFolder;
+        set { if (_oplRootFolder != value) { _oplRootFolder = value; OnPropertyChanged(); } }
+    }
     public string Status
     {
         get => _status;
         set { if (_status != value) { _status = value; OnPropertyChanged(); } }
-    }
-    public bool CanProcess
-    {
-        get => _canProcess;
-        set { if (_canProcess != value) { _canProcess = value; OnPropertyChanged(); } }
     }
 
     public ProcessPopsViewModel(IPathsService paths, GameProcessor processor, SettingsService settings)
@@ -40,70 +43,55 @@ public class ProcessPopsViewModel : BindableObject
         _processor = processor;
         _settings = settings;
 
-        SelectFolderCommand = new Command(async () => await SelectFolder());
-        ProcessCommand = new Command(async () => await ProcessGames());
+        SelectOplRootFolderCommand = new Command(async () => await SelectOplRootFolder());
+        ProcessAllCommand = new Command(async () => await ProcessAllGames());
+        GenerateElfCommand = new Command(async () => await GenerateAllElfs());
+        GenerateCheatsCommand = new Command(async () => await GenerateAllCheats());
+        DownloadCoversCommand = new Command(async () => await DownloadAllCovers());
+        RefreshCommand = new Command(RefreshGameLists);
 
-        // Cargar automáticamente la carpeta de destino guardada en Inicio
-        LoadDestinationFolder();
+        // Cargar carpeta raíz OPL desde los ajustes guardados en Inicio
+        LoadOplRootFolder();
     }
 
-    private void LoadDestinationFolder()
+    private void LoadOplRootFolder()
     {
-        var destFolder = _settings.DestinationFolder;
-        if (!string.IsNullOrEmpty(destFolder))
+        var savedRoot = _settings.DestinationFolder;
+        if (!string.IsNullOrEmpty(savedRoot))
         {
-            _selectedFolder = destFolder;
-            CanProcess = true;
-            Status = $"Carpeta de destino (desde Inicio): {destFolder}";
-
-            // Si la implementación es Android, actualizar RootFolder
+            _oplRootFolder = savedRoot;
             if (_paths is PathsServiceAndroid androidPaths)
-            {
-                androidPaths.RootFolder = destFolder;
-            }
+                androidPaths.RootFolder = savedRoot;
+            Status = $"Raíz OPL: {savedRoot}";
+            RefreshGameLists();
         }
         else
         {
-            Status = "No hay carpeta de destino configurada en Inicio.";
+            Status = "Selecciona la carpeta raíz OPL (desde Inicio o aquí).";
         }
     }
 
-    private async Task SelectFolder()
+    private async Task SelectOplRootFolder()
     {
         try
         {
-            _selectedFolder = await _paths.SelectFolderAsync();
-            CanProcess = !string.IsNullOrEmpty(_selectedFolder);
-            Status = _selectedFolder ?? "No se seleccionó carpeta.";
-
-            // Actualizar también la raíz OPL
-            if (!string.IsNullOrEmpty(_selectedFolder) && _paths is PathsServiceAndroid androidPaths)
+            var path = await _paths.SelectFolderAsync();
+            if (path != null)
             {
-                androidPaths.RootFolder = _selectedFolder;
+                _settings.DestinationFolder = path;
+                _settings.RootFolder = path;
+                await _settings.SaveAsync();
+                OplRootFolder = path;
+
+                if (_paths is PathsServiceAndroid androidPaths)
+                    androidPaths.RootFolder = path;
+
+                RefreshGameLists();
             }
         }
         catch (Exception ex)
         {
-            Status = $"Error al seleccionar carpeta: {ex.Message}";
-        }
-    }
-
-    private async Task ProcessGames()
-    {
-        if (_selectedFolder == null) return;
-
-        Status = "Procesando...";
-        try
-        {
-            await _processor.ProcessFolderAsync(_selectedFolder);
-            Status = "Procesamiento completado.";
-
-            // Escanear las carpetas de destino y llenar las listas
-            RefreshGameLists();
-        }
-        catch (Exception ex)
-        {
-            Status = $"Error durante el procesamiento: {ex.Message}";
+            Status = $"Error al seleccionar raíz OPL: {ex.Message}";
         }
     }
 
@@ -115,30 +103,79 @@ public class ProcessPopsViewModel : BindableObject
 
         try
         {
-            // PS1 (POPS)
             if (Directory.Exists(_paths.PopsFolder))
             {
                 foreach (var dir in Directory.GetDirectories(_paths.PopsFolder))
                     Ps1Games.Add(Path.GetFileName(dir));
             }
-
-            // PS2 (DVD)
             if (Directory.Exists(_paths.DvdFolder))
             {
                 foreach (var file in Directory.GetFiles(_paths.DvdFolder, "*.ISO"))
                     Ps2Games.Add(Path.GetFileNameWithoutExtension(file));
             }
-
-            // APPS (si aplica)
             if (Directory.Exists(_paths.AppsFolder))
             {
                 foreach (var file in Directory.GetFiles(_paths.AppsFolder, "*.ELF"))
                     AppsGames.Add(Path.GetFileNameWithoutExtension(file));
             }
+            Status = $"Juegos cargados: {Ps1Games.Count} PS1, {Ps2Games.Count} PS2, {AppsGames.Count} APPs";
         }
         catch (Exception ex)
         {
-            Status += $"\nError al listar juegos: {ex.Message}";
+            Status = $"Error al listar juegos: {ex.Message}";
         }
+    }
+
+    private async Task ProcessAllGames()
+    {
+        Status = "Procesando todos los juegos...";
+        try
+        {
+            await GenerateAllElfs();
+            await GenerateAllCheats();
+            await DownloadAllCovers();
+            Status = "Procesamiento completo.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error durante el procesamiento: {ex.Message}";
+        }
+    }
+
+    private async Task GenerateAllElfs()
+    {
+        Status = "Generando ELFs...";
+        foreach (var game in Ps1Games)
+        {
+            string gamePath = Path.Combine(_paths.PopsFolder, game);
+            await _processor.GenerateElfAsync(gamePath, game, "PS1");
+        }
+        Status += " OK";
+    }
+
+    private async Task GenerateAllCheats()
+    {
+        Status = "Generando cheats...";
+        foreach (var game in Ps1Games)
+        {
+            string gamePath = Path.Combine(_paths.PopsFolder, game);
+            await _processor.GenerateCheatsAsync(game, gamePath, "PS1");
+        }
+        foreach (var game in Ps2Games)
+        {
+            string gamePath = Path.Combine(_paths.DvdFolder, game + ".ISO");
+            await _processor.GenerateCheatsAsync(game, gamePath, "PS2");
+        }
+        Status += " OK";
+    }
+
+    private async Task DownloadAllCovers()
+    {
+        Status = "Descargando covers...";
+        foreach (var game in Ps1Games)
+            await _processor.DownloadCoverAsync(game, "PS1");
+        foreach (var game in Ps2Games)
+            await _processor.DownloadCoverAsync(game, "PS2");
+        Status += " OK";
     }
 }
