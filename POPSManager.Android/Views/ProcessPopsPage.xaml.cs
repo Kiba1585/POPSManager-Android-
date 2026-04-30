@@ -1,28 +1,22 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
-using Microsoft.Maui.Storage;
-using Microsoft.Maui.ApplicationModel.DataTransfer;
 using POPSManager.Android.ViewModels;
 
 namespace POPSManager.Android.Views;
 
 public partial class ProcessPopsPage : ContentPage
 {
-    private ProcessPopsViewModel? _vm;
-    private string? _lastError;
+    private readonly ProcessPopsViewModel _vm;
 
     public ProcessPopsPage(ProcessPopsViewModel vm)
     {
         InitializeComponent();
         _vm = vm;
-        BindingContext = vm;
+        BindingContext = _vm;
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        _vm?.RefreshFromSettings();
+        _vm.RefreshFromSettings();
     }
 }
