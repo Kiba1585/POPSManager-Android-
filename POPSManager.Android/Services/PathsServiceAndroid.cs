@@ -3,6 +3,7 @@ using AndroidX.Core.Content;
 using CommunityToolkit.Maui.Storage;
 using POPSManager.Core.Services;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using AndroidUri = Android.Net.Uri;
@@ -21,7 +22,6 @@ public class PathsServiceAndroid : IPathsService
             if (_rootFolder != value)
             {
                 _rootFolder = value;
-                // Al cambiar la raíz, aseguramos que las carpetas existan
                 EnsureOplFoldersExist();
             }
         }
@@ -33,8 +33,12 @@ public class PathsServiceAndroid : IPathsService
     public string ArtFolder => Path.Combine(RootFolder, "ART");
     public string DvdFolder => Path.Combine(RootFolder, "DVD");
 
-    // POPSTARTER.ELF base se espera en la raíz OPL
-    public string PopstarterElfPath => Path.Combine(RootFolder, "POPSTARTER.ELF");
+    // POPSTARTER.ELF se deriva automáticamente de la raíz OPL, pero la interfaz necesita set
+    public string PopstarterElfPath
+    {
+        get => Path.Combine(RootFolder, "POPSTARTER.ELF");
+        set { /* ignorado en Android */ }
+    }
     public string PopstarterPs2ElfPath { get; set; } = "";
 
     public string TempFolder => FileSystem.CacheDirectory;
@@ -69,7 +73,6 @@ public class PathsServiceAndroid : IPathsService
             Directory.CreateDirectory(CfgFolder);
             Directory.CreateDirectory(ArtFolder);
             Directory.CreateDirectory(AppsFolder);
-            System.Diagnostics.Debug.WriteLine($"Carpetas OPL creadas bajo {RootFolder}");
         }
         catch (Exception ex)
         {
@@ -132,7 +135,7 @@ public class PathsServiceAndroid : IPathsService
         }
     }
 
-    // Ya no se necesitan SetElfPath ni SetPs2ElfPath, pero se mantienen por la interfaz
-    public void SetElfPath(string path) { /* ignorado, automático */ }
+    // Cumplen con la interfaz
+    public void SetElfPath(string path) => PopstarterElfPath = path;   // set vacío
     public void SetPs2ElfPath(string path) => PopstarterPs2ElfPath = path;
 }
