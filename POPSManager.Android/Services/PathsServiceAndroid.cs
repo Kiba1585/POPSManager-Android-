@@ -41,6 +41,26 @@ public class PathsServiceAndroid : IPathsService
         return result?.FullPath;
     }
 
+    /// <summary>
+    /// Crea todas las carpetas necesarias para el OPL dentro de la raíz especificada.
+    /// </summary>
+    public void EnsureOplFoldersExist()
+    {
+        try
+        {
+            Directory.CreateDirectory(RootFolder);
+            Directory.CreateDirectory(PopsFolder);
+            Directory.CreateDirectory(DvdFolder);
+            Directory.CreateDirectory(CfgFolder);
+            Directory.CreateDirectory(ArtFolder);
+            Directory.CreateDirectory(AppsFolder);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error al crear carpetas OPL: {ex.Message}");
+        }
+    }
+
     public bool IsFolderWritable(string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
@@ -68,8 +88,7 @@ public class PathsServiceAndroid : IPathsService
         {
             var context = global::Android.App.Application.Context;
             var packageManager = context.PackageManager;
-            if (packageManager is null)
-                return;
+            if (packageManager is null) return;
 
             var androidUri = AndroidX.Core.Content.FileProvider.GetUriForFile(
                 context,
