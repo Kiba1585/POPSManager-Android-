@@ -60,7 +60,6 @@ public class ConvertViewModel : BindableObject
         ConvertCommand = new Command(async () => await SafeExecute(ConvertFiles));
         OpenOutputFolderCommand = new Command(OpenOutputFolder);
 
-        // Cargar rutas guardadas desde Home
         LoadSavedPaths();
     }
 
@@ -143,7 +142,6 @@ public class ConvertViewModel : BindableObject
             return;
         }
 
-        // Configurar el converter para que reporte progreso
         var progressConverter = new ConverterService(
             log: msg => _log.Log(msg),
             setStatus: msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
