@@ -48,10 +48,17 @@ namespace POPSManager.Android.Services
 
                 // 3. Descargar y extraer
                 onProgress?.Invoke($"Descargando base de datos ({tag})...");
-                string zipTemp = Path.Combine(Path.GetTempPath(), "popsmanager_db.zip");
+
+                // Usar un nombre de archivo único para evitar conflictos
+                string zipTemp = Path.Combine(Path.GetTempPath(), $"popsmanager_db_{Guid.NewGuid():N}.zip");
+
+                // Eliminar cualquier archivo previo que pudiera estar bloqueado
+                if (File.Exists(zipTemp))
+                {
+                    try { File.Delete(zipTemp); } catch { /* ignorar si falla */ }
+                }
 
                 using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-                // Necesario para GitHub API y descargas
                 client.DefaultRequestHeaders.Add("User-Agent", "POPSManager-Android");
 
                 var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
@@ -59,21 +66,24 @@ namespace POPSManager.Android.Services
 
                 long totalBytes = response.Content.Headers.ContentLength ?? -1;
                 using var stream = await response.Content.ReadAsStreamAsync();
-                using var fileStream = File.Create(zipTemp);
 
-                byte[] buffer = new byte[8192];
-                long totalRead = 0;
-                int bytesRead;
-                while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                // Guardar el archivo descargado
+                using (var fileStream = new FileStream(zipTemp, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    await fileStream.WriteAsync(buffer, 0, bytesRead);
-                    totalRead += bytesRead;
-                    if (totalBytes > 0)
+                    byte[] buffer = new byte[8192];
+                    long totalRead = 0;
+                    int bytesRead;
+                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                     {
-                        int percent = (int)((totalRead * 100) / totalBytes);
-                        onProgress?.Invoke($"Descargando... {percent}%");
+                        await fileStream.WriteAsync(buffer, 0, bytesRead);
+                        totalRead += bytesRead;
+                        if (totalBytes > 0)
+                        {
+                            int percent = (int)((totalRead * 100) / totalBytes);
+                            onProgress?.Invoke($"Descargando... {percent}%");
+                        }
                     }
-                }
+                } // El FileStream se cierra aquí
 
                 onProgress?.Invoke("Extrayendo base de datos...");
 
@@ -84,13 +94,20 @@ namespace POPSManager.Android.Services
                     Directory.CreateDirectory(oplRootFolder);
                     ZipFile.ExtractToDirectory(zipTemp, oplRootFolder, true);
                 }
-                File.Delete(zipTemp);
+
+                // Eliminar el archivo temporal después de la extracción
+                try { File.Delete(zipTemp); } catch { /* ignorar si falla */ }
 
                 // 4. Guardar la versión actual
                 Preferences.Set(DbVersionKey, tag);
 
                 onProgress?.Invoke("Base de datos actualizada correctamente.");
                 return true;
+            }
+            catch (IOException ioEx) when (ioEx.Message.Contains("SharingViolation"))
+            {
+                onProgress?.Invoke("El archivo temporal está en uso. Inténtalo de nuevo en unos segundos.");
+                return false;
             }
             catch (Exception ex)
             {
@@ -111,7 +128,6 @@ namespace POPSManager.Android.Services
                 var root = doc.RootElement;
                 string? tag = root.GetProperty("tag_name").GetString();
 
-                // La URL directa del asset llamado POPSManager_DB.zip
                 var assets = root.GetProperty("assets").EnumerateArray();
                 string? downloadUrl = assets
                     .FirstOrDefault(a => a.GetProperty("name").GetString() == "POPSManager_DB.zip")
@@ -122,7 +138,6 @@ namespace POPSManager.Android.Services
             }
             catch
             {
-                // Fallback: usar la URL estándar de descarga por si la API falla
                 return ("unknown", DefaultDownloadUrl);
             }
         }
