@@ -1,37 +1,34 @@
 using Android.App;
-using Android.Runtime;
-using System;
+using Android.Content.PM;
+using Android.OS;
+using Android.Provider;
 
 namespace POPSManager.Android;
 
-[Application]
-public class MainApplication : MauiApplication
+[Activity(
+    Theme = "@style/Maui.SplashTheme",
+    MainLauncher = true,
+    ConfigurationChanges = ConfigChanges.ScreenSize |
+                           ConfigChanges.Orientation |
+                           ConfigChanges.UiMode |
+                           ConfigChanges.ScreenLayout |
+                           ConfigChanges.SmallestScreenSize |
+                           ConfigChanges.Density)]
+public class MainActivity : MauiAppCompatActivity
 {
-    public MainApplication(IntPtr handle, JniHandleOwnership ownership)
-        : base(handle, ownership)
+    protected override void OnCreate(Bundle? savedInstanceState)
     {
-    }
+        base.OnCreate(savedInstanceState);
 
-    public override void OnCreate()
-    {
-        try
+        // Solicitar permiso de gestión de almacenamiento en Android 11+
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
         {
-            base.OnCreate();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine("Error en MainApplication.OnCreate: " + ex.ToString());
-            try
+            if (!Android.OS.Environment.IsExternalStorageManager)
             {
-                new AlertDialog.Builder(this)
-                    .SetTitle("Error")
-                    .SetMessage(ex.Message)
-                    .SetPositiveButton("OK", (sender, args) => { })
-                    .Show();
+                var intent = new Android.Content.Intent(
+                    Settings.ActionManageAllFilesAccessPermission);
+                StartActivity(intent);
             }
-            catch { /* evitar crash si el contexto no permite diálogos */ }
         }
     }
-
-    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
 }
