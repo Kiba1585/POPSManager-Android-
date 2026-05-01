@@ -32,7 +32,6 @@ namespace POPSManager.Core.Services
 
         public Task SaveAsync()
         {
-            // Guardar como archivo de texto simple (JSON escrito a mano) para evitar problemas de trimming
             using var writer = new StreamWriter(_settingsPath, false);
             writer.WriteLine("{");
             WriteValue(writer, "SourceFolder", SourceFolder);
@@ -43,13 +42,24 @@ namespace POPSManager.Core.Services
             WriteValue(writer, "UseCovers", UseCovers ? "true" : "false");
             WriteValue(writer, "UseMetadata", UseMetadata ? "true" : "false");
             WriteValue(writer, "UseTitleInElfName", UseTitleInElfName ? "true" : "false");
-            // Automation se guarda como un objeto JSON simple
-            writer.WriteLine("  \"Automation\": {");
-            WriteValue(writer, "AutoConvert", Automation.AutoConvert ? "true" : "false");
-            WriteValue(writer, "AutoProcess", Automation.AutoProcess ? "true" : "false");
-            writer.WriteLine("  }");
-            writer.WriteLine("}");
 
+            // Automation se guarda como un objeto JSON simplificado
+            writer.WriteLine("  \"Automation\": {");
+            WriteValue(writer, "Mode", Automation.Mode.ToString());
+            WriteValue(writer, "Conversion", Automation.Conversion.ToString());
+            WriteValue(writer, "MultiDisc", Automation.MultiDisc.ToString());
+            WriteValue(writer, "FolderCreation", Automation.FolderCreation.ToString());
+            WriteValue(writer, "ElfGeneration", Automation.ElfGeneration.ToString());
+            WriteValue(writer, "Covers", Automation.Covers.ToString());
+            WriteValue(writer, "Database", Automation.Database.ToString());
+            WriteValue(writer, "Cheats", Automation.Cheats.ToString());
+            WriteValue(writer, "Metadata", Automation.Metadata.ToString());
+            WriteValue(writer, "Notifications", Automation.Notifications.ToString());
+            WriteValue(writer, "Lng", Automation.Lng.ToString());
+            WriteValue(writer, "Thm", Automation.Thm.ToString());
+            writer.WriteLine("  }");
+
+            writer.WriteLine("}");
             OnSettingsChanged?.Invoke();
             return Task.CompletedTask;
         }
@@ -84,7 +94,7 @@ namespace POPSManager.Core.Services
                     string val = line.Substring(colon + 1).Trim().Trim(',').Trim('"');
                     if (key == "Automation")
                     {
-                        // Se leerían más líneas, pero por simplicidad ignoramos y mantenemos valores por defecto
+                        // La lectura del objeto interno se omite por simplicidad
                         continue;
                     }
                     data[key] = val;
