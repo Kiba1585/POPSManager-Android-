@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
@@ -227,7 +226,6 @@ public class ProcessPopsViewModel : BindableObject
 
     /// <summary>
     /// Devuelve el título limpio compatible con OPL (sin Game ID, espacios reemplazados por '_').
-    /// El Game ID se elimina aunque aparezca en el nombre del archivo.
     /// </summary>
     private string OplCompatibleTitle(string rawName, int discNumber, bool multiDisc)
     {
@@ -239,17 +237,14 @@ public class ProcessPopsViewModel : BindableObject
             title = title.Substring(dashIndex + 3).Trim();
         else
         {
-            // Si no hay " - ", intentar eliminar un prefijo tipo SLUS_000.00 o SLUS_00000
             var parts = title.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length > 1 && parts[0].Length >= 4 && parts[0].Contains('_'))
                 title = parts[1];
         }
 
-        // Añadir número de disco si es multidisco
         if (multiDisc && discNumber > 1)
             title += $" (CD{discNumber})";
 
-        // Reemplazar espacios por guiones bajos y eliminar caracteres problemáticos
         return title
             .Replace(' ', '_')
             .Replace("'", "")
@@ -304,20 +299,19 @@ public class ProcessPopsViewModel : BindableObject
                 continue;
             }
 
-            // Carpeta del juego dentro de APPS (usando el nombre limpio)
+            // Carpeta del juego dentro de APPS
             string gameAppFolder = Path.Combine(_paths.AppsFolder, game.Name);
             Directory.CreateDirectory(gameAppFolder);
 
-            // Nombre del ELF: GAMEID.Nombre_Limpio.ELF (sin prefijo XX, aunque podría añadirse si se desea)
+            // Nombre del ELF: mismo nombre del VCD pero extensión .ELF
             string vcdFileName = Path.GetFileNameWithoutExtension(game.FilePath);
-            string elfFileName = $"{vcdFileName}.ELF";   // mismo nombre que el VCD pero extensión .ELF
+            string elfFileName = $"{vcdFileName}.ELF";
             string elfPath = Path.Combine(gameAppFolder, elfFileName);
 
-            // Copiar POPSTARTER.ELF como el nuevo ELF y parchearlo
             ElfGenerator.GeneratePs1Elf(
                 baseElf,
                 game.FilePath,
-                elfPath,
+                elfPath,              // ruta completa del ELF de salida
                 game.DiscNumber,
                 game.Name,
                 game.GameId,
@@ -387,6 +381,7 @@ public class ProcessPopsViewModel : BindableObject
     {
         bool any = false;
 
+        // --- Carátula ---
         string artFile = Path.Combine(_paths.ArtFolder, gameId + ".jpg");
         if (!File.Exists(artFile))
         {
@@ -399,11 +394,14 @@ public class ProcessPopsViewModel : BindableObject
             }
         }
 
+        // --- Metadatos (.cfg) ---
         string cfgFile = Path.Combine(_paths.CfgFolder, gameId + ".cfg");
         if (!File.Exists(cfgFile))
         {
+            // Intentar descargar del mirror
             if (!await DownloadFileAsync($"{mirrorBase}/CFG/{gameId}.cfg", cfgFile))
             {
+                // Fallback: generar un .cfg básico (placeholder)
                 try
                 {
                     await File.WriteAllTextAsync(cfgFile,
@@ -434,7 +432,6 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                // Formato: GAMEID.Nombre_Limpio.VCD (mayúsculas)
                 string newName = $"{game.GameId}.{game.Name}.VCD";
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
@@ -459,7 +456,6 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                // Formato: GAMEID.Nombre_Limpio.iso (minúsculas)
                 string newName = $"{game.GameId}.{game.Name}.iso";
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
