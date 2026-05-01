@@ -1,19 +1,11 @@
 <Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
        xmlns:views="clr-namespace:POPSManager.Android.Views"
-       x:Class="POPSManager.Android.AppShell"
-       Shell.NavBarBackgroundColor="{StaticResource SurfaceColor}"
-       Shell.NavBarTitleColor="{StaticResource TextPrimary}"
-       Shell.TabBarBackgroundColor="{StaticResource SurfaceColor}"
-       Shell.TabBarForegroundColor="{StaticResource AccentBlue}"
-       Shell.TabBarUnselectedColor="{StaticResource TextMuted}">
+       x:Class="POPSManager.Android.AppShell">
 
     <TabBar>
-        <ShellContent Route="Inicio"    Title="Inicio"    ContentTemplate="{DataTemplate views:HomePage}"
-                      Icon="home.png" />
-        <ShellContent Route="Convertir" Title="Convertir" ContentTemplate="{DataTemplate views:ConvertPage}"
-                      Icon="swap_horiz.png" />
-        <ShellContent Route="Procesar"  Title="Procesar"  ContentTemplate="{DataTemplate views:ProcessPopsPage}"
-                      Icon="build.png" />
+        <ShellContent Route="Inicio"    Title="Inicio"    ContentTemplate="{DataTemplate views:HomePage}" />
+        <ShellContent Route="Convertir" Title="Convertir" ContentTemplate="{DataTemplate views:ConvertPage}" />
+        <ShellContent Route="Procesar"  Title="Procesar"  ContentTemplate="{DataTemplate views:ProcessPopsPage}" />
     </TabBar>
 </Shell>
