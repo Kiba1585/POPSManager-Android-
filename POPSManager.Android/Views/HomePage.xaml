@@ -15,13 +15,11 @@
 
                     <Label Text="Carpeta de origen (juegos BIN/ISO):" Style="{StaticResource FieldLabel}" />
                     <Entry Text="{Binding SourcePath}" Placeholder="Ruta de origen" Style="{StaticResource DarkEntry}" />
-                    <Button Text="Seleccionar carpeta de origen" Style="{StaticResource PrimaryButton}"
-                            ImageSource="folder_open.png" />
+                    <Button Text="Seleccionar carpeta de origen" Command="{Binding ChangeSourceFolderCommand}" Style="{StaticResource PrimaryButton}" />
 
                     <Label Text="Carpeta de destino (raíz OPL):" Style="{StaticResource FieldLabel}" />
                     <Entry Text="{Binding DestinationPath}" Placeholder="Ruta de destino" Style="{StaticResource DarkEntry}" />
-                    <Button Text="Seleccionar carpeta de destino" Style="{StaticResource PrimaryButton}"
-                            ImageSource="folder_open.png" />
+                    <Button Text="Seleccionar carpeta de destino" Command="{Binding ChangeDestinationFolderCommand}" Style="{StaticResource PrimaryButton}" />
 
                     <HorizontalStackLayout Spacing="10">
                         <CheckBox IsChecked="{Binding ProcessSubfolders}" Color="{StaticResource AccentBlue}" />
@@ -33,9 +31,9 @@
             <!-- Acciones rápidas -->
             <Label Text="⚡ Acciones rápidas" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
             <FlexLayout Wrap="Wrap" JustifyContent="Start">
-                <Button Text="🎮 Convertir juegos" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
-                <Button Text="⚙️ Procesar juegos" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
-                <Button Text="📂 Abrir carpeta raíz" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
+                <Button Text="🎮 Convertir juegos" Command="{Binding OpenConvertCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
+                <Button Text="⚙️ Procesar juegos" Command="{Binding OpenProcessPopsCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
+                <Button Text="📂 Abrir carpeta raíz" Command="{Binding OpenRootFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
             </FlexLayout>
 
             <!-- Información del sistema -->
