@@ -144,18 +144,28 @@ public class ProcessPopsViewModel : BindableObject
         {
             int popsCount = 0, dvdCount = 0, appsCount = 0;
 
+            // Buscar VCD tanto en mayúsculas como en minúsculas, evitando duplicados
             if (Directory.Exists(_paths.PopsFolder))
             {
-                foreach (var vcd in Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly))
+                var vcdFiles = Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly)
+                    .Concat(Directory.GetFiles(_paths.PopsFolder, "*.vcd", SearchOption.TopDirectoryOnly))
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var vcd in vcdFiles)
                 {
                     Ps1Games.Add(BuildGameEntry(vcd, _paths.PopsFolder));
                     popsCount++;
                 }
             }
 
+            // Buscar ISO tanto en mayúsculas como en minúsculas, evitando duplicados
             if (Directory.Exists(_paths.DvdFolder))
             {
-                foreach (var iso in Directory.GetFiles(_paths.DvdFolder, "*.ISO", SearchOption.TopDirectoryOnly))
+                var isoFiles = Directory.GetFiles(_paths.DvdFolder, "*.ISO", SearchOption.TopDirectoryOnly)
+                    .Concat(Directory.GetFiles(_paths.DvdFolder, "*.iso", SearchOption.TopDirectoryOnly))
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var iso in isoFiles)
                 {
                     Ps2Games.Add(BuildGameEntry(iso, _paths.DvdFolder));
                     dvdCount++;
@@ -280,7 +290,7 @@ public class ProcessPopsViewModel : BindableObject
             ElfGenerator.GeneratePs1Elf(
                 baseElf,
                 game.FilePath,
-                gameAppsFolder,        // <-- output a la subcarpeta del juego
+                gameAppsFolder,
                 game.DiscNumber,
                 game.Name,
                 game.GameId,
@@ -383,7 +393,7 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId} - {game.Name}.VCD";  // MAYÚSCULAS
+                string newName = $"{game.GameId} - {game.Name}.VCD";  // siempre mayúsculas
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -407,7 +417,7 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId} - {game.Name}.iso";  // ISO no requiere mayúsculas
+                string newName = $"{game.GameId} - {game.Name}.iso";  // minúsculas, pero la lista acepta ambas
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
