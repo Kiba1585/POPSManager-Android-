@@ -272,11 +272,15 @@ public class ProcessPopsViewModel : BindableObject
                 _log.Log($"[ELF] No se encontró VCD: {game.FilePath}");
                 continue;
             }
-            Directory.CreateDirectory(game.GameFolder);
+
+            // Crear subcarpeta con el nombre del juego dentro de APPS
+            string gameAppsFolder = Path.Combine(_paths.AppsFolder, game.Name);
+            Directory.CreateDirectory(gameAppsFolder);
+
             ElfGenerator.GeneratePs1Elf(
                 baseElf,
                 game.FilePath,
-                _paths.AppsFolder,
+                gameAppsFolder,        // <-- output a la subcarpeta del juego
                 game.DiscNumber,
                 game.Name,
                 game.GameId,
@@ -332,7 +336,6 @@ public class ProcessPopsViewModel : BindableObject
     {
         bool any = false;
 
-        // Carátula
         string artFile = Path.Combine(_paths.ArtFolder, gameId + ".jpg");
         if (!File.Exists(artFile))
         {
@@ -345,13 +348,11 @@ public class ProcessPopsViewModel : BindableObject
             }
         }
 
-        // Metadatos
         string cfgFile = Path.Combine(_paths.CfgFolder, gameId + ".cfg");
         if (!File.Exists(cfgFile))
         {
             if (!await DownloadFileAsync($"{mirrorBase}/CFG/{gameId}.cfg", cfgFile))
             {
-                // Fallback: generar .cfg local con el nombre del juego
                 try
                 {
                     await File.WriteAllTextAsync(cfgFile,
@@ -382,7 +383,7 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId} - {game.Name}.vcd";
+                string newName = $"{game.GameId} - {game.Name}.VCD";  // MAYÚSCULAS
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -406,7 +407,7 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId} - {game.Name}.iso";
+                string newName = $"{game.GameId} - {game.Name}.iso";  // ISO no requiere mayúsculas
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -424,7 +425,6 @@ public class ProcessPopsViewModel : BindableObject
             catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
         }
 
-        // Forzar reescaneo completo
         Ps1Games.Clear();
         Ps2Games.Clear();
         RefreshGameLists();
@@ -450,7 +450,8 @@ public class ProcessPopsViewModel : BindableObject
         catch { return false; }
     }
 
-    protected bool SetProperty<T>(ref T backingStore, T value, [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
+    protected bool SetProperty<T>(ref T backingStore, T value,
+        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
     {
         if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
         backingStore = value;
