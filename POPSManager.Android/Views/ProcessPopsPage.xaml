@@ -29,6 +29,13 @@
                     BackgroundColor="#4CC2FF"
                     TextColor="White" />
 
+            <!-- Ajustes de almacenamiento -->
+            <Button Text="Abrir ajustes de almacenamiento"
+                    Command="{Binding OpenStorageSettingsCommand}"
+                    BackgroundColor="#FF4444"
+                    TextColor="White"
+                    Margin="0,10,0,0" />
+
             <!-- Opciones de cheats -->
             <Frame BackgroundColor="#2D2D2D"
                    Padding="10"
