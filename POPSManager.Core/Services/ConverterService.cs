@@ -29,7 +29,6 @@ public class ConverterService
 
         Directory.CreateDirectory(outputFolder);
 
-        // Solo convertimos archivos .bin (imágenes PS1)
         var files = Directory.GetFiles(sourceFolder, "*.bin", SearchOption.TopDirectoryOnly)
             .OrderBy(f => f)
             .ToArray();
@@ -50,7 +49,8 @@ public class ConverterService
     private async Task ConvertToVcdAsync(string inputPath, string outputFolder)
     {
         string name = Path.GetFileNameWithoutExtension(inputPath);
-        string outputPath = Path.Combine(outputFolder, name + ".vcd");
+        // Guardar con extensión .VCD (mayúsculas)
+        string outputPath = Path.Combine(outputFolder, name + ".VCD");
 
         await ConvertPs1ToVcdAsync(inputPath, outputPath, name);
     }
