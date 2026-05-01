@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
@@ -26,9 +27,9 @@ public class ProcessPopsViewModel : BindableObject
     public class GameEntry
     {
         public string GameId { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string FilePath { get; set; } = "";
-        public string GameFolder { get; set; } = "";
+        public string Name { get; set; } = "";           // nombre limpio sin Game ID
+        public string FilePath { get; set; } = "";        // ruta al .VCD o .ISO
+        public string GameFolder { get; set; } = "";      // carpeta auxiliar (para cheats, VMC, etc.)
         public bool IsMultiDisc { get; set; }
         public int DiscNumber { get; set; } = 1;
         public override string ToString() => Name;
@@ -144,7 +145,7 @@ public class ProcessPopsViewModel : BindableObject
         {
             int popsCount = 0, dvdCount = 0, appsCount = 0;
 
-            // Buscar VCD tanto en mayúsculas como en minúsculas, evitando duplicados
+            // Buscar VCD (mayúsculas y minúsculas)
             if (Directory.Exists(_paths.PopsFolder))
             {
                 var vcdFiles = Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly)
@@ -158,7 +159,7 @@ public class ProcessPopsViewModel : BindableObject
                 }
             }
 
-            // Buscar ISO tanto en mayúsculas como en minúsculas, evitando duplicados
+            // Buscar ISO (mayúsculas y minúsculas)
             if (Directory.Exists(_paths.DvdFolder))
             {
                 var isoFiles = Directory.GetFiles(_paths.DvdFolder, "*.ISO", SearchOption.TopDirectoryOnly)
@@ -172,6 +173,7 @@ public class ProcessPopsViewModel : BindableObject
                 }
             }
 
+            // ELFs en APPS (directos)
             if (Directory.Exists(_paths.AppsFolder))
             {
                 foreach (var elf in Directory.GetFiles(_paths.AppsFolder, "*.ELF", SearchOption.TopDirectoryOnly))
@@ -180,7 +182,7 @@ public class ProcessPopsViewModel : BindableObject
                     {
                         Name = Path.GetFileNameWithoutExtension(elf),
                         FilePath = elf,
-                        GameFolder = Path.GetDirectoryName(elf)!
+                        GameFolder = _paths.AppsFolder
                     });
                     appsCount++;
                 }
@@ -196,20 +198,20 @@ public class ProcessPopsViewModel : BindableObject
 
     private GameEntry BuildGameEntry(string filePath, string parentFolder)
     {
-        string gameName = Path.GetFileNameWithoutExtension(filePath);
-        string companionFolder = Path.Combine(parentFolder, gameName);
+        string fileName = Path.GetFileNameWithoutExtension(filePath);
+        string companionFolder = Path.Combine(parentFolder, fileName);
 
         bool multiDisc = File.Exists(Path.Combine(parentFolder, "DISCS.TXT"));
         int discNumber = 1;
         if (multiDisc)
         {
-            var upper = gameName.ToUpperInvariant();
+            var upper = fileName.ToUpperInvariant();
             if (upper.Contains("CD2") || upper.Contains("DISC2")) discNumber = 2;
             else if (upper.Contains("CD3") || upper.Contains("DISC3")) discNumber = 3;
             else if (upper.Contains("CD4") || upper.Contains("DISC4")) discNumber = 4;
         }
 
-        string cleanTitle = NormalizeGameTitle(gameName, discNumber, multiDisc);
+        string cleanTitle = OplCompatibleTitle(fileName, discNumber, multiDisc);
         string gameId = ExtractGameId(filePath);
 
         return new GameEntry
@@ -223,20 +225,36 @@ public class ProcessPopsViewModel : BindableObject
         };
     }
 
-    private string NormalizeGameTitle(string rawName, int discNumber, bool includeDiscIfMulti)
+    /// <summary>
+    /// Devuelve el título limpio compatible con OPL (sin Game ID, espacios reemplazados por '_').
+    /// El Game ID se elimina aunque aparezca en el nombre del archivo.
+    /// </summary>
+    private string OplCompatibleTitle(string rawName, int discNumber, bool multiDisc)
     {
         string title = rawName;
+
+        // Quitar Game ID del principio (ej: "SLUS_000.00 - ..." o "SLUS_000.00 ...")
         int dashIndex = title.IndexOf(" - ");
-        if (dashIndex > 0) title = title.Substring(dashIndex + 3).Trim();
+        if (dashIndex > 0)
+            title = title.Substring(dashIndex + 3).Trim();
         else
         {
+            // Si no hay " - ", intentar eliminar un prefijo tipo SLUS_000.00 o SLUS_00000
             var parts = title.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 1 && parts[0].Length >= 4 && parts[0].Contains("-"))
+            if (parts.Length > 1 && parts[0].Length >= 4 && parts[0].Contains('_'))
                 title = parts[1];
         }
-        if (includeDiscIfMulti && discNumber > 1)
+
+        // Añadir número de disco si es multidisco
+        if (multiDisc && discNumber > 1)
             title += $" (CD{discNumber})";
-        return title.Trim();
+
+        // Reemplazar espacios por guiones bajos y eliminar caracteres problemáticos
+        return title
+            .Replace(' ', '_')
+            .Replace("'", "")
+            .Replace(":", "")
+            .Trim();
     }
 
     private string ExtractGameId(string path)
@@ -269,7 +287,10 @@ public class ProcessPopsViewModel : BindableObject
         string baseElf = _paths.PopstarterElfPath;
         if (!File.Exists(baseElf))
         {
-            Status = $"POPSTARTER.ELF no encontrado.\nSe buscó en:\n{Path.Combine(_paths.RootFolder, "POPSTARTER.ELF")}\n{Path.Combine(_paths.PopsFolder, "POPSTARTER.ELF")}\nCópialo a una de esas ubicaciones.";
+            Status = $"POPSTARTER.ELF no encontrado.\nSe buscó en:\n" +
+                     $"{Path.Combine(_paths.RootFolder, "POPSTARTER.ELF")}\n" +
+                     $"{Path.Combine(_paths.PopsFolder, "POPSTARTER.ELF")}\n" +
+                     "Cópialo a una de esas ubicaciones.";
             await Task.CompletedTask;
             return;
         }
@@ -283,20 +304,40 @@ public class ProcessPopsViewModel : BindableObject
                 continue;
             }
 
-            // Crear subcarpeta con el nombre del juego dentro de APPS
-            string gameAppsFolder = Path.Combine(_paths.AppsFolder, game.Name);
-            Directory.CreateDirectory(gameAppsFolder);
+            // Carpeta del juego dentro de APPS (usando el nombre limpio)
+            string gameAppFolder = Path.Combine(_paths.AppsFolder, game.Name);
+            Directory.CreateDirectory(gameAppFolder);
 
+            // Nombre del ELF: GAMEID.Nombre_Limpio.ELF (sin prefijo XX, aunque podría añadirse si se desea)
+            string vcdFileName = Path.GetFileNameWithoutExtension(game.FilePath);
+            string elfFileName = $"{vcdFileName}.ELF";   // mismo nombre que el VCD pero extensión .ELF
+            string elfPath = Path.Combine(gameAppFolder, elfFileName);
+
+            // Copiar POPSTARTER.ELF como el nuevo ELF y parchearlo
             ElfGenerator.GeneratePs1Elf(
                 baseElf,
                 game.FilePath,
-                gameAppsFolder,
+                elfPath,
                 game.DiscNumber,
                 game.Name,
                 game.GameId,
                 msg => _log.Log(msg));
+
+            // Crear title.cfg para OPL moderno
+            string titleCfgPath = Path.Combine(gameAppFolder, "title.cfg");
+            try
+            {
+                string cfgContent = $"title={game.Name}\nboot={elfFileName}\n";
+                File.WriteAllText(titleCfgPath, cfgContent);
+            }
+            catch (Exception ex)
+            {
+                _log.Log($"[ELF] Error creando title.cfg: {ex.Message}");
+            }
+
             count++;
         }
+
         Status = count > 0 ? $"{count} ELFs generados." : "No se generaron ELFs (sin VCDs).";
         await Task.CompletedTask;
     }
@@ -393,7 +434,8 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId} - {game.Name}.VCD";  // siempre mayúsculas
+                // Formato: GAMEID.Nombre_Limpio.VCD (mayúsculas)
+                string newName = $"{game.GameId}.{game.Name}.VCD";
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -402,7 +444,7 @@ public class ProcessPopsViewModel : BindableObject
 
                     if (Directory.Exists(game.GameFolder))
                     {
-                        string newFolderPath = Path.Combine(folder, $"{game.GameId} - {game.Name}");
+                        string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
                         Directory.Move(game.GameFolder, newFolderPath);
                         game.GameFolder = newFolderPath;
                     }
@@ -417,7 +459,8 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId} - {game.Name}.iso";  // minúsculas, pero la lista acepta ambas
+                // Formato: GAMEID.Nombre_Limpio.iso (minúsculas)
+                string newName = $"{game.GameId}.{game.Name}.iso";
                 string newPath = Path.Combine(folder, newName);
                 if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -425,7 +468,7 @@ public class ProcessPopsViewModel : BindableObject
                     game.FilePath = newPath;
                     if (Directory.Exists(game.GameFolder))
                     {
-                        string newFolderPath = Path.Combine(folder, $"{game.GameId} - {game.Name}");
+                        string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
                         Directory.Move(game.GameFolder, newFolderPath);
                         game.GameFolder = newFolderPath;
                     }
