@@ -27,8 +27,8 @@ public class ProcessPopsViewModel : BindableObject
     {
         public string GameId { get; set; } = "";
         public string Name { get; set; } = "";
-        public string FilePath { get; set; } = "";   // ruta al .VCD o .ISO
-        public string GameFolder { get; set; } = ""; // carpeta auxiliar (con CHEAT.TXT, VMC, etc.)
+        public string FilePath { get; set; } = "";
+        public string GameFolder { get; set; } = "";
         public bool IsMultiDisc { get; set; }
         public int DiscNumber { get; set; } = 1;
         public override string ToString() => Name;
@@ -116,18 +116,16 @@ public class ProcessPopsViewModel : BindableObject
                 global::Android.Provider.Settings.ActionManageAllFilesAccessPermission);
             global::Android.App.Application.Context.StartActivity(intent);
         }
-        catch { /* no se puede abrir */ }
+        catch { }
     }
 
     private void RefreshGameLists()
     {
-        // Verificar permiso de almacenamiento total (necesario para leer carpetas fuera de la app)
         if (OperatingSystem.IsAndroidVersionAtLeast(30))
         {
             if (!global::Android.OS.Environment.IsExternalStorageManager)
             {
-                Status = "⚠️ Permiso de almacenamiento no concedido.\n" +
-                         "Pulsa el botón 'Abrir ajustes' para activarlo.";
+                Status = "⚠️ Permiso de almacenamiento no concedido.\nPulsa 'Abrir ajustes' para activarlo.";
                 Ps1Games.Clear();
                 Ps2Games.Clear();
                 AppsGames.Clear();
@@ -144,42 +142,41 @@ public class ProcessPopsViewModel : BindableObject
 
         try
         {
-            // PS1: archivos .VCD en POPS (directamente, sin subcarpetas)
+            int popsCount = 0, dvdCount = 0, appsCount = 0;
+
             if (Directory.Exists(_paths.PopsFolder))
             {
                 foreach (var vcd in Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly))
                 {
-                    var entry = BuildGameEntry(vcd, _paths.PopsFolder);
-                    Ps1Games.Add(entry);
+                    Ps1Games.Add(BuildGameEntry(vcd, _paths.PopsFolder));
+                    popsCount++;
                 }
             }
 
-            // PS2: archivos .ISO en DVD (directamente)
             if (Directory.Exists(_paths.DvdFolder))
             {
                 foreach (var iso in Directory.GetFiles(_paths.DvdFolder, "*.ISO", SearchOption.TopDirectoryOnly))
                 {
-                    var entry = BuildGameEntry(iso, _paths.DvdFolder);
-                    Ps2Games.Add(entry);
+                    Ps2Games.Add(BuildGameEntry(iso, _paths.DvdFolder));
+                    dvdCount++;
                 }
             }
 
-            // APPs: archivos .ELF en APPS
             if (Directory.Exists(_paths.AppsFolder))
             {
                 foreach (var elf in Directory.GetFiles(_paths.AppsFolder, "*.ELF", SearchOption.TopDirectoryOnly))
                 {
-                    string name = Path.GetFileNameWithoutExtension(elf);
                     AppsGames.Add(new GameEntry
                     {
-                        Name = name,
+                        Name = Path.GetFileNameWithoutExtension(elf),
                         FilePath = elf,
                         GameFolder = Path.GetDirectoryName(elf)!
                     });
+                    appsCount++;
                 }
             }
 
-            Status = $"Juegos: {Ps1Games.Count} PS1, {Ps2Games.Count} PS2, {AppsGames.Count} APPs";
+            Status = $"Encontrados: {popsCount} VCD, {dvdCount} ISO, {appsCount} ELF.\nRaíz: {_paths.RootFolder}";
         }
         catch (Exception ex)
         {
@@ -189,11 +186,9 @@ public class ProcessPopsViewModel : BindableObject
 
     private GameEntry BuildGameEntry(string filePath, string parentFolder)
     {
-        string fileName = Path.GetFileName(filePath);
         string gameName = Path.GetFileNameWithoutExtension(filePath);
         string companionFolder = Path.Combine(parentFolder, gameName);
 
-        // Detectar multidisco y número de disco
         bool multiDisc = File.Exists(Path.Combine(parentFolder, "DISCS.TXT"));
         int discNumber = 1;
         if (multiDisc)
@@ -264,7 +259,7 @@ public class ProcessPopsViewModel : BindableObject
         string baseElf = _paths.PopstarterElfPath;
         if (!File.Exists(baseElf))
         {
-            Status = $"POPSTARTER.ELF no encontrado.{Environment.NewLine}Cópialo a la raíz de la carpeta destino.";
+            Status = $"POPSTARTER.ELF no encontrado.\nSe buscó en:\n{Path.Combine(_paths.RootFolder, "POPSTARTER.ELF")}\n{Path.Combine(_paths.PopsFolder, "POPSTARTER.ELF")}\nCópialo a una de esas ubicaciones.";
             await Task.CompletedTask;
             return;
         }
@@ -327,15 +322,17 @@ public class ProcessPopsViewModel : BindableObject
         {
             var game = allGames[i];
             MainThread.BeginInvokeOnMainThread(() => Status = $"{i + 1}/{allGames.Count}: {game.Name}");
-            if (await DownloadSingleGameAssetsAsync(game.GameId, mirrorBase))
+            if (await DownloadSingleGameAssetsAsync(game.GameId, game.Name, mirrorBase))
                 success++;
         }
         Status = $"Descarga finalizada. {success}/{allGames.Count} juegos actualizados.";
     }
 
-    private async Task<bool> DownloadSingleGameAssetsAsync(string gameId, string mirrorBase)
+    private async Task<bool> DownloadSingleGameAssetsAsync(string gameId, string gameName, string mirrorBase)
     {
         bool any = false;
+
+        // Carátula
         string artFile = Path.Combine(_paths.ArtFolder, gameId + ".jpg");
         if (!File.Exists(artFile))
         {
@@ -347,12 +344,25 @@ public class ProcessPopsViewModel : BindableObject
                 any = true;
             }
         }
+
+        // Metadatos
         string cfgFile = Path.Combine(_paths.CfgFolder, gameId + ".cfg");
         if (!File.Exists(cfgFile))
         {
-            if (await DownloadFileAsync($"{mirrorBase}/CFG/{gameId}.cfg", cfgFile))
-                any = true;
+            if (!await DownloadFileAsync($"{mirrorBase}/CFG/{gameId}.cfg", cfgFile))
+            {
+                // Fallback: generar .cfg local con el nombre del juego
+                try
+                {
+                    await File.WriteAllTextAsync(cfgFile,
+                        $"Title={gameName}\nGenre=Unknown\nRelease=\nDeveloper=\n");
+                    any = true;
+                }
+                catch { }
+            }
+            else any = true;
         }
+
         return any;
     }
 
@@ -361,14 +371,13 @@ public class ProcessPopsViewModel : BindableObject
         if (!Ps1Games.Any() && !Ps2Games.Any())
         {
             Status = "No hay juegos para renombrar.";
-            await Task.CompletedTask;
             return;
         }
 
         int renamed = 0;
         var errors = new List<string>();
 
-        foreach (var game in Ps1Games)
+        foreach (var game in Ps1Games.ToList())
         {
             try
             {
@@ -392,7 +401,7 @@ public class ProcessPopsViewModel : BindableObject
             catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
         }
 
-        foreach (var game in Ps2Games)
+        foreach (var game in Ps2Games.ToList())
         {
             try
             {
@@ -415,7 +424,11 @@ public class ProcessPopsViewModel : BindableObject
             catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
         }
 
+        // Forzar reescaneo completo
+        Ps1Games.Clear();
+        Ps2Games.Clear();
         RefreshGameLists();
+
         Status = errors.Any()
             ? $"Renombrados: {renamed}. Errores: {string.Join("; ", errors)}"
             : $"{renamed} juegos renombrados.";
