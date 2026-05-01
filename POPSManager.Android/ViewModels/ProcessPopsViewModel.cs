@@ -529,4 +529,37 @@ public class ProcessPopsViewModel : BindableObject
         }
 
         Ps1Games.Clear();
-    
+        Ps2Games.Clear();
+        RefreshGameLists();
+
+        Status = errors.Any()
+            ? $"Renombrados: {renamed}. Errores: {string.Join("; ", errors)}"
+            : $"{renamed} juegos renombrados.";
+        await Task.CompletedTask;
+    }
+
+    // ==================== MÉTODOS AUXILIARES ====================
+    private async Task<bool> DownloadFileAsync(string url, string destination)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return false;
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await using var fs = new FileStream(destination, FileMode.Create);
+            await response.Content.CopyToAsync(fs);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    protected bool SetProperty<T>(ref T backingStore, T value,
+        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
+    {
+        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
+        backingStore = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+}
