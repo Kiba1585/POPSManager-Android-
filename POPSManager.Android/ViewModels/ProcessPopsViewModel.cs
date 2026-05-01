@@ -55,7 +55,7 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand RefreshCommand { get; }
     public ICommand RenameAllCommand { get; }
     public ICommand OpenStorageSettingsCommand { get; }
-    public ICommand UpdateDatabaseCommand { get; }   // ← NUEVO
+    public ICommand UpdateDatabaseCommand { get; }
 
     public string OplRootFolder { get => _oplRootFolder; set => SetProperty(ref _oplRootFolder, value); }
     public string Status { get => _status; set => SetProperty(ref _status, value); }
@@ -74,7 +74,7 @@ public class ProcessPopsViewModel : BindableObject
         RefreshCommand = new Command(RefreshGameLists);
         RenameAllCommand = new Command(async () => await RenameAllGames());
         OpenStorageSettingsCommand = new Command(OpenStorageSettings);
-        UpdateDatabaseCommand = new Command(async () => await UpdateDatabase());   // ← NUEVO
+        UpdateDatabaseCommand = new Command(async () => await UpdateDatabase());
 
         RefreshFromSettings();
     }
@@ -121,14 +121,12 @@ public class ProcessPopsViewModel : BindableObject
         catch { }
     }
 
-    // ========== NUEVO: Actualizar base de datos desde ZIP ==========
     private async Task UpdateDatabase()
     {
-        bool ok = await DatabaseUpdater.DownloadAndExtractDatabaseAsync(
+        await DatabaseUpdater.DownloadAndExtractDatabaseAsync(
             _paths.RootFolder,
             msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
         );
-        Status = ok ? "Base de datos actualizada." : "Error al actualizar la base de datos.";
     }
 
     private void RefreshGameLists()
@@ -236,15 +234,10 @@ public class ProcessPopsViewModel : BindableObject
         };
     }
 
-    /// <summary>
-    /// Devuelve el título limpio compatible con OPL (sin Game ID, espacios reemplazados por '_').
-    /// Conserva región, idiomas y cualquier otro detalle que aparezca en el nombre original.
-    /// </summary>
     private string OplCompatibleTitle(string rawName, int discNumber, bool multiDisc)
     {
         string title = rawName;
 
-        // Quitar Game ID del principio (ej: "SLUS_000.00 - ..." o "SLUS_000.00 ...")
         int dashIndex = title.IndexOf(" - ");
         if (dashIndex > 0)
             title = title.Substring(dashIndex + 3).Trim();
@@ -258,7 +251,6 @@ public class ProcessPopsViewModel : BindableObject
         if (multiDisc && discNumber > 1)
             title += $" (CD{discNumber})";
 
-        // Reemplazar espacios por guiones bajos y eliminar caracteres muy problemáticos
         return title
             .Replace(' ', '_')
             .Replace("'", "")
@@ -391,12 +383,10 @@ public class ProcessPopsViewModel : BindableObject
         Status = $"Descarga finalizada. {success}/{allGames.Count} juegos actualizados.";
     }
 
-    // Solo descarga carátulas; los metadatos vienen de la base de datos
     private async Task<bool> DownloadSingleGameAssetsAsync(string gameId, string gameName, string mirrorBase)
     {
         bool any = false;
 
-        // Carátula
         string artFile = Path.Combine(_paths.ArtFolder, gameId + ".jpg");
         if (!File.Exists(artFile))
         {
@@ -409,7 +399,6 @@ public class ProcessPopsViewModel : BindableObject
             }
         }
 
-        // El .cfg ya debería estar presente tras extraer la base de datos
         return any;
     }
 
