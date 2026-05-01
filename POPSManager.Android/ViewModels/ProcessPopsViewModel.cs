@@ -546,4 +546,53 @@ public class ProcessPopsViewModel : BindableObject
                     continue;
                 }
 
-                File.Move(game
+                File.Move(game.FilePath, newPath);
+                game.FilePath = newPath;
+                if (Directory.Exists(game.GameFolder))
+                {
+                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
+                    Directory.Move(game.GameFolder, newFolderPath);
+                    game.GameFolder = newFolderPath;
+                }
+                renamed++;
+            }
+            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
+        }
+
+        Ps1Games.Clear();
+        Ps2Games.Clear();
+        RefreshGameLists();
+
+        string result = $"Renombrados: {renamed}. Omitidos: {skipped} (ya tenían el formato).";
+        if (errors.Any())
+            result += $" Errores: {string.Join("; ", errors)}";
+
+        Status = result;
+        await Task.CompletedTask;
+    }
+
+    // ==================== MÉTODOS AUXILIARES ====================
+    private async Task<bool> DownloadFileAsync(string url, string destination)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return false;
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await using var fs = new FileStream(destination, FileMode.Create);
+            await response.Content.CopyToAsync(fs);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    protected bool SetProperty<T>(ref T backingStore, T value,
+        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
+    {
+        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
+        backingStore = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+}
