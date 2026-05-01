@@ -2,32 +2,31 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="POPSManager.Android.Views.ConvertPage"
-             Title="Convertir Juegos">
+             Title="Convertir Juegos"
+             BackgroundColor="{StaticResource BackgroundPrimary}">
 
     <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="15">
+        <VerticalStackLayout Padding="20" Spacing="18">
 
-            <Label Text="Origen" FontSize="16" TextColor="White" />
-            <Entry Text="{Binding SourceFolder}" Placeholder="Carpeta de origen" BackgroundColor="#2D2D2D" TextColor="White" />
-            <Button Text="Seleccionar origen" Command="{Binding SelectSourceCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+            <Label Text="📁 Origen" Style="{StaticResource SectionTitle}" />
+            <Entry Text="{Binding SourceFolder}" Placeholder="Carpeta de origen" Style="{StaticResource DarkEntry}" />
+            <Button Text="Seleccionar origen" Style="{StaticResource PrimaryButton}" ImageSource="folder_open.png" />
 
-            <Label Text="Destino" FontSize="16" TextColor="White" />
-            <Entry Text="{Binding DestFolder}" Placeholder="Carpeta de destino" BackgroundColor="#2D2D2D" TextColor="White" />
-            <Button Text="Seleccionar destino" Command="{Binding SelectDestCommand}" BackgroundColor="#4CC2FF" TextColor="White" />
+            <Label Text="📁 Destino" Style="{StaticResource SectionTitle}" />
+            <Entry Text="{Binding DestFolder}" Placeholder="Carpeta de destino" Style="{StaticResource DarkEntry}" />
+            <Button Text="Seleccionar destino" Style="{StaticResource PrimaryButton}" ImageSource="folder_open.png" />
 
-            <Button Text="Convertir archivos" Command="{Binding ConvertCommand}" BackgroundColor="#2FA0D8" TextColor="White" />
+            <Button Text="🔄 Convertir archivos" Style="{StaticResource PrimaryButton}" />
+            <Button Text="📂 Abrir carpeta de salida" Style="{StaticResource SecondaryButton}" />
 
-            <Label Text="{Binding Status}" FontSize="14" TextColor="#CCCCCC" />
-
-            <!-- Botón para abrir la carpeta real de salida -->
-            <Button Text="Abrir carpeta de salida" Command="{Binding OpenOutputFolderCommand}" BackgroundColor="#2D2D2D" TextColor="White" />
+            <Label Text="{Binding Status}" Style="{StaticResource StatusLabel}" />
 
             <CollectionView ItemsSource="{Binding Files}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <HorizontalStackLayout Spacing="5">
-                            <Label Text="{Binding Icon}" />
-                            <Label Text="{Binding Name}" TextColor="White" />
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Icon}" FontSize="14" VerticalOptions="Center" />
+                            <Label Text="{Binding Name}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
                         </HorizontalStackLayout>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
