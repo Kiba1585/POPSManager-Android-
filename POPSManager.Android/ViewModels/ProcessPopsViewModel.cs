@@ -117,7 +117,7 @@ public class ProcessPopsViewModel : BindableObject
 
         try
         {
-            // PS1: archivos .VCD en POPS
+            // PS1: archivos .VCD en POPS (directamente, sin subcarpetas)
             if (Directory.Exists(_paths.PopsFolder))
             {
                 foreach (var vcd in Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly))
@@ -127,7 +127,7 @@ public class ProcessPopsViewModel : BindableObject
                 }
             }
 
-            // PS2: archivos .ISO en DVD
+            // PS2: archivos .ISO en DVD (directamente)
             if (Directory.Exists(_paths.DvdFolder))
             {
                 foreach (var iso in Directory.GetFiles(_paths.DvdFolder, "*.ISO", SearchOption.TopDirectoryOnly))
@@ -171,7 +171,6 @@ public class ProcessPopsViewModel : BindableObject
         int discNumber = 1;
         if (multiDisc)
         {
-            // Intentar extraer número de disco del nombre del archivo (CD1, CD2, etc.)
             var upper = gameName.ToUpperInvariant();
             if (upper.Contains("CD2") || upper.Contains("DISC2")) discNumber = 2;
             else if (upper.Contains("CD3") || upper.Contains("DISC3")) discNumber = 3;
@@ -239,6 +238,7 @@ public class ProcessPopsViewModel : BindableObject
         if (!File.Exists(baseElf))
         {
             Status = $"POPSTARTER.ELF no encontrado.{Environment.NewLine}Cópialo a la raíz de la carpeta destino.";
+            await Task.CompletedTask;
             return;
         }
 
@@ -250,7 +250,6 @@ public class ProcessPopsViewModel : BindableObject
                 _log.Log($"[ELF] No se encontró VCD: {game.FilePath}");
                 continue;
             }
-            // Crear carpeta auxiliar si no existe
             Directory.CreateDirectory(game.GameFolder);
             ElfGenerator.GeneratePs1Elf(
                 baseElf,
@@ -263,6 +262,7 @@ public class ProcessPopsViewModel : BindableObject
             count++;
         }
         Status = count > 0 ? $"{count} ELFs generados." : "No se generaron ELFs (sin VCDs).";
+        await Task.CompletedTask;
     }
 
     private async Task GenerateAllCheats()
@@ -282,6 +282,7 @@ public class ProcessPopsViewModel : BindableObject
             count++;
         }
         Status = count > 0 ? $"{count} CHEAT.TXT generados." : "No hay juegos de PS1 para cheats.";
+        await Task.CompletedTask;
     }
 
     private async Task DownloadAllCoversAndMetadata()
@@ -333,6 +334,7 @@ public class ProcessPopsViewModel : BindableObject
         if (!Ps1Games.Any() && !Ps2Games.Any())
         {
             Status = "No hay juegos para renombrar.";
+            await Task.CompletedTask;
             return;
         }
 
@@ -391,6 +393,7 @@ public class ProcessPopsViewModel : BindableObject
         Status = errors.Any()
             ? $"Renombrados: {renamed}. Errores: {string.Join("; ", errors)}"
             : $"{renamed} juegos renombrados.";
+        await Task.CompletedTask;
     }
 
     private async Task<bool> DownloadFileAsync(string url, string destination)
