@@ -1,36 +1,65 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="POPSManager.Android.Views.ConvertPage"
-             Title="Convertir Juegos"
+             x:Class="POPSManager.Android.Views.HomePage"
+             Title="POPSManager Android"
              BackgroundColor="{StaticResource BackgroundPrimary}">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="18">
 
-            <Label Text="📁 Origen" Style="{StaticResource SectionTitle}" />
-            <Entry Text="{Binding SourceFolder}" Placeholder="Carpeta de origen" Style="{StaticResource DarkEntry}" />
-            <Button Text="Seleccionar origen" Style="{StaticResource PrimaryButton}" ImageSource="folder_open.png" />
+            <!-- Rutas de trabajo -->
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="📁 Rutas de trabajo" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
 
-            <Label Text="📁 Destino" Style="{StaticResource SectionTitle}" />
-            <Entry Text="{Binding DestFolder}" Placeholder="Carpeta de destino" Style="{StaticResource DarkEntry}" />
-            <Button Text="Seleccionar destino" Style="{StaticResource PrimaryButton}" ImageSource="folder_open.png" />
+                    <Label Text="Carpeta de origen (juegos BIN/ISO):" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding SourcePath}" Placeholder="Ruta de origen" Style="{StaticResource DarkEntry}" />
+                    <Button Text="Seleccionar carpeta de origen" Command="{Binding ChangeSourceFolderCommand}" Style="{StaticResource PrimaryButton}" />
 
-            <Button Text="🔄 Convertir archivos" Style="{StaticResource PrimaryButton}" />
-            <Button Text="📂 Abrir carpeta de salida" Style="{StaticResource SecondaryButton}" />
+                    <Label Text="Carpeta de destino (raíz OPL):" Style="{StaticResource FieldLabel}" />
+                    <Entry Text="{Binding DestinationPath}" Placeholder="Ruta de destino" Style="{StaticResource DarkEntry}" />
+                    <Button Text="Seleccionar carpeta de destino" Command="{Binding ChangeDestinationFolderCommand}" Style="{StaticResource PrimaryButton}" />
 
-            <Label Text="{Binding Status}" Style="{StaticResource StatusLabel}" />
+                    <HorizontalStackLayout Spacing="10">
+                        <CheckBox IsChecked="{Binding ProcessSubfolders}" Color="{StaticResource AccentBlue}" />
+                        <Label Text="Procesar subcarpetas recursivamente" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
 
-            <CollectionView ItemsSource="{Binding Files}">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate>
-                        <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding Icon}" FontSize="14" VerticalOptions="Center" />
-                            <Label Text="{Binding Name}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
-                        </HorizontalStackLayout>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+            <!-- Acciones rápidas -->
+            <Label Text="⚡ Acciones rápidas" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+            <FlexLayout Wrap="Wrap" JustifyContent="Start">
+                <Button Text="🎮 Convertir juegos" Command="{Binding OpenConvertCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
+                <Button Text="⚙️ Procesar juegos" Command="{Binding OpenProcessPopsCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
+                <Button Text="📂 Abrir carpeta raíz" Command="{Binding OpenRootFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
+            </FlexLayout>
+
+            <!-- Información del sistema -->
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="💻 Información del sistema" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Label Text="{Binding SystemInfo}" FontSize="14" TextColor="{StaticResource TextSecondary}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Registro de actividad -->
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="📋 Registro de actividad" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <CollectionView ItemsSource="{Binding LogEntries}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding Icon}" FontSize="14" VerticalOptions="Center" />
+                                    <Label Text="{Binding Message}" FontSize="12" TextColor="{Binding Color}" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Frame>
 
         </VerticalStackLayout>
     </ScrollView>
