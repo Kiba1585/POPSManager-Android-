@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
@@ -27,9 +26,9 @@ public class ProcessPopsViewModel : BindableObject
     public class GameEntry
     {
         public string GameId { get; set; } = "";
-        public string Name { get; set; } = "";           // nombre limpio sin Game ID
-        public string FilePath { get; set; } = "";        // ruta al .VCD o .ISO
-        public string GameFolder { get; set; } = "";      // carpeta auxiliar (para cheats, VMC, etc.)
+        public string Name { get; set; } = "";
+        public string FilePath { get; set; } = "";
+        public string GameFolder { get; set; } = "";
         public bool IsMultiDisc { get; set; }
         public int DiscNumber { get; set; } = 1;
         public override string ToString() => Name;
@@ -80,8 +79,7 @@ public class ProcessPopsViewModel : BindableObject
         RefreshFromSettings();
     }
 
-    // ... (métodos existentes sin cambios: RefreshFromSettings, SelectOplRootFolder, OpenStorageSettings, UpdateDatabase)
-
+    // ==================== REFRESCAR ====================
     public void RefreshFromSettings()
     {
         var savedRoot = _settings.DestinationFolder;
@@ -131,8 +129,6 @@ public class ProcessPopsViewModel : BindableObject
             msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
         );
     }
-
-    // ... (RefreshGameLists, BuildGameEntry, etc. sin cambios)
 
     private void RefreshGameLists()
     {
@@ -279,10 +275,7 @@ public class ProcessPopsViewModel : BindableObject
             return;
         }
 
-        // Procesar multidisco primero (crea DISCS.TXT, genera ELFs y cheats)
         await ProcessMultidisc();
-
-        // Descargar covers y metadatos para todos
         await DownloadAllCoversAndMetadata();
         Status = "Procesamiento completo.";
         await Task.CompletedTask;
@@ -303,7 +296,6 @@ public class ProcessPopsViewModel : BindableObject
             return;
         }
 
-        // Primero, procesar multidisco para asegurar DISCS.TXT
         await ProcessMultidisc();
 
         int count = 0;
@@ -315,11 +307,8 @@ public class ProcessPopsViewModel : BindableObject
                 continue;
             }
 
-            // Para juegos multidisco, la carpeta ya fue creada y unificada
-            if (game.IsMultiDisc && game.DiscNumber != 1)
+            if (game.IsMultiDisc)
             {
-                // La carpeta ya fue asignada por ProcessMultidisc, no se crea de nuevo
-                // Solo generamos el ELF si no existe
                 string elfFileName = $"{Path.GetFileNameWithoutExtension(game.FilePath)}.ELF";
                 string elfPath = Path.Combine(game.GameFolder, elfFileName);
                 if (!File.Exists(elfPath))
@@ -328,9 +317,7 @@ public class ProcessPopsViewModel : BindableObject
                     count++;
                 }
                 else
-                {
                     _log.Log($"[ELF] Ya existe: {elfFileName}");
-                }
                 continue;
             }
 
@@ -346,11 +333,8 @@ public class ProcessPopsViewModel : BindableObject
                 count++;
             }
             else
-            {
                 _log.Log($"[ELF] Ya existe: {elfFileNameNormal}");
-            }
 
-            // Crear title.cfg
             string titleCfgPath = Path.Combine(gameAppFolder, "title.cfg");
             try
             {
@@ -372,57 +356,54 @@ public class ProcessPopsViewModel : BindableObject
     {
         var ps1Groups = Ps1Games
             .Where(g => !string.IsNullOrEmpty(g.GameId))
-            .GroupBy(g => new string(g.GameId.TakeWhile(c => c != '.' && c != '_').ToArray())) // Agrupa por código base (SLUS, SLES...)
+            .GroupBy(g => new string(g.GameId.TakeWhile(c => c != '.' && c != '_').ToArray()))
             .ToList();
 
         foreach (var group in ps1Groups)
         {
             var discs = group.OrderBy(g => g.DiscNumber).ToList();
-            if (discs.Count <= 1) continue; // No es multidisco
+            if (discs.Count <= 1) continue;
 
-            // Determinar carpeta común
+            // Carpeta común
             string baseFolderName = discs.First().Name.Replace(" (CD1)", "").Replace(" (CD2)", "").Replace(" (CD3)", "").Replace(" (CD4)", "").Trim();
             string commonFolder = Path.Combine(Path.GetDirectoryName(discs.First().FilePath)!, baseFolderName);
             Directory.CreateDirectory(commonFolder);
 
-            // Generar DISCS.TXT
+            // DISCS.TXT
             string discsTxtPath = Path.Combine(commonFolder, "DISCS.TXT");
             var discNames = discs.Select(d => Path.GetFileName(d.FilePath)).ToList();
             if (!File.Exists(discsTxtPath))
             {
-                await File.WriteAllAllLinesAsync(discsTxtPath, discNames);
+                await File.WriteAllLinesAsync(discsTxtPath, discNames);
                 _log.Log($"[Multidisco] Creado {discsTxtPath}");
             }
 
-            // Actualizar carpetas auxiliares de todos los discos para que apunten a la común
-            string previousElfTarget = "";
-            foreach (var disc in discs)
+            // ELFs para todos los discos
+            string baseElf = _paths.PopstarterElfPath;
+            if (File.Exists(baseElf))
             {
-                disc.GameFolder = commonFolder;
-
-                // Si el ELF aún no existe, lo generamos en la carpeta común
-                string elfFileName = $"{Path.GetFileNameWithoutExtension(disc.FilePath)}.ELF";
-                string elfPath = Path.Combine(commonFolder, elfFileName);
-                if (!File.Exists(elfPath))
+                foreach (var disc in discs)
                 {
-                    string baseElf = _paths.PopstarterElfPath;
-                    if (File.Exists(baseElf))
+                    disc.GameFolder = commonFolder;
+                    string elfFileName = $"{Path.GetFileNameWithoutExtension(disc.FilePath)}.ELF";
+                    string elfPath = Path.Combine(commonFolder, elfFileName);
+                    if (!File.Exists(elfPath))
                     {
                         ElfGenerator.GeneratePs1Elf(baseElf, disc.FilePath, elfPath, disc.DiscNumber, disc.Name, disc.GameId, msg => _log.Log(msg));
                     }
                 }
+            }
 
-                // Crear title.cfg para cada disco (o solo para el primero si se prefiere)
-                string titleCfgPath = Path.Combine(commonFolder, "title.cfg");
-                if (!File.Exists(titleCfgPath))
-                {
-                    string cfgContent = $"title={baseFolderName}\nboot={elfFileName}\n";
-                    await File.WriteAllTextAsync(titleCfgPath, cfgContent);
-                }
+            // title.cfg para el primer disco
+            string titleCfgPath = Path.Combine(commonFolder, "title.cfg");
+            if (!File.Exists(titleCfgPath))
+            {
+                string elfFileName = $"{Path.GetFileNameWithoutExtension(discs.First().FilePath)}.ELF";
+                string cfgContent = $"title={baseFolderName}\nboot={elfFileName}\n";
+                await File.WriteAllTextAsync(titleCfgPath, cfgContent);
             }
         }
 
-        // Para PS2 la lógica sería similar pero no tenemos implementado multidisco aún
         await Task.CompletedTask;
     }
 
@@ -488,7 +469,7 @@ public class ProcessPopsViewModel : BindableObject
         return any;
     }
 
-    // ===================== RENOMBRAR JUEGOS ====================
+    // ==================== RENOMBRAR JUEGOS ====================
     private async Task RenameAllGames()
     {
         if (!Ps1Games.Any() && !Ps2Games.Any())
@@ -548,37 +529,4 @@ public class ProcessPopsViewModel : BindableObject
         }
 
         Ps1Games.Clear();
-        Ps2Games.Clear();
-        RefreshGameLists();
-
-        Status = errors.Any()
-            ? $"Renombrados: {renamed}. Errores: {string.Join("; ", errors)}"
-            : $"{renamed} juegos renombrados.";
-        await Task.CompletedTask;
-    }
-
-    // ==================== MÉTODOS AUXILIARES ====================
-    private async Task<bool> DownloadFileAsync(string url, string destination)
-    {
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            var response = await client.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return false;
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            await using var fs = new FileStream(destination, FileMode.Create);
-            await response.Content.CopyToAsync(fs);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    protected bool SetProperty<T>(ref T backingStore, T value,
-        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
-    {
-        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
-        backingStore = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-}
+    
