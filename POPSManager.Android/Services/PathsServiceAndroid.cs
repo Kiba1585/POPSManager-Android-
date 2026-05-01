@@ -33,9 +33,17 @@ public class PathsServiceAndroid : IPathsService
     public string ArtFolder => Path.Combine(RootFolder, "ART");
     public string DvdFolder => Path.Combine(RootFolder, "DVD");
 
+    // POPSTARTER.ELF: se busca primero en la raíz OPL, luego en POPS (por si acaso)
     public string PopstarterElfPath
     {
-        get => Path.Combine(RootFolder, "POPSTARTER.ELF");
+        get
+        {
+            string rootElf = Path.Combine(RootFolder, "POPSTARTER.ELF");
+            if (File.Exists(rootElf)) return rootElf;
+            string popsElf = Path.Combine(PopsFolder, "POPSTARTER.ELF");
+            if (File.Exists(popsElf)) return popsElf;
+            return rootElf; // devuelve la ruta estándar aunque no exista
+        }
         set { /* ignorado en Android */ }
     }
     public string PopstarterPs2ElfPath { get; set; } = "";
@@ -106,7 +114,6 @@ public class PathsServiceAndroid : IPathsService
         {
             var context = global::Android.App.Application.Context;
 
-            // Usar Storage Access Framework para abrir la carpeta
             var intent = new Intent(Intent.ActionOpenDocumentTree);
             intent.AddFlags(ActivityFlags.GrantReadUriPermission);
             intent.AddFlags(ActivityFlags.NewTask);
@@ -122,7 +129,6 @@ public class PathsServiceAndroid : IPathsService
         }
         catch
         {
-            // Fallback genérico
             try
             {
                 var intent = new Intent(Intent.ActionView);
@@ -133,7 +139,7 @@ public class PathsServiceAndroid : IPathsService
                 intent.AddFlags(ActivityFlags.NewTask);
                 global::Android.App.Application.Context.StartActivity(intent);
             }
-            catch { /* silencioso */ }
+            catch { }
         }
     }
 
