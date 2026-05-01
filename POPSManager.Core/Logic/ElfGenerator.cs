@@ -7,12 +7,12 @@ namespace POPSManager.Core.Logic
     public static class ElfGenerator
     {
         /// <summary>
-        /// Genera un ELF para un juego de PS1.
+        /// Genera un ELF para un juego de PS1 (cualquier disco).
         /// </summary>
         /// <param name="baseElfPath">Ruta del POPSTARTER.ELF original.</param>
         /// <param name="vcdFullPath">Ruta completa del archivo .VCD.</param>
         /// <param name="outputElfPath">Ruta completa donde se creará el nuevo .ELF.</param>
-        /// <param name="discNumber">Número de disco (solo se genera para CD1).</param>
+        /// <param name="discNumber">Número de disco (1, 2, 3...).</param>
         /// <param name="cleanTitle">Nombre limpio que mostrará OPL.</param>
         /// <param name="gameId">Game ID del juego.</param>
         /// <param name="log">Acción para registrar mensajes.</param>
@@ -20,16 +20,13 @@ namespace POPSManager.Core.Logic
         {
             try
             {
-                if (discNumber != 1) { log("[ELF] Solo CD1 genera ELF."); return true; }
                 if (!File.Exists(baseElfPath)) { log("[ELF] ERROR: POPSTARTER.ELF no encontrado."); return false; }
                 if (!File.Exists(vcdFullPath)) { log("[ELF] ERROR: VCD no encontrado."); return false; }
 
-                // Crear carpeta de destino si no existe
                 string? outputDir = Path.GetDirectoryName(outputElfPath);
                 if (!string.IsNullOrEmpty(outputDir))
                     Directory.CreateDirectory(outputDir);
 
-                // Copiar el ELF base
                 File.Copy(baseElfPath, outputElfPath, true);
 
                 // La ruta del VCD es simplemente el nombre del archivo (porque está directamente en POPS)
@@ -42,7 +39,7 @@ namespace POPSManager.Core.Logic
                 WriteAsciiFixed(writer, 0x100, NormalizeAscii(vcdRelativePath), 128);
                 WriteAsciiFixed(writer, 0x220, NormalizeAscii(cleanTitle), 48);
 
-                log("[ELF] ELF PS1 generado correctamente.");
+                log($"[ELF] ELF PS1 (disco {discNumber}) generado correctamente.");
                 return true;
             }
             catch (Exception ex) { log($"[ELF] ERROR: {ex.Message}"); return false; }
