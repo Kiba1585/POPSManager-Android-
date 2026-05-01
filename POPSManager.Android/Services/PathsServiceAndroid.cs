@@ -3,6 +3,7 @@ using AndroidX.Core.Content;
 using CommunityToolkit.Maui.Storage;
 using POPSManager.Core.Services;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using AndroidUri = Android.Net.Uri;
@@ -111,7 +112,7 @@ public class PathsServiceAndroid : IPathsService
             intent.AddFlags(ActivityFlags.NewTask);
 
             // Convertir la ruta a una URI de contenido (Android 11+)
-            if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.R)
+            if (global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.R)
             {
                 var uri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/primary%3A" +
                     folderPath.Replace("/storage/emulated/0/", "").Replace("/", "%2F"));
@@ -120,7 +121,7 @@ public class PathsServiceAndroid : IPathsService
 
             context.StartActivity(intent);
         }
-        catch (Exception ex)
+        catch
         {
             // Fallback: intentar con un intent genérico
             try
@@ -133,10 +134,7 @@ public class PathsServiceAndroid : IPathsService
                 intent.AddFlags(ActivityFlags.NewTask);
                 global::Android.App.Application.Context.StartActivity(intent);
             }
-            catch (Exception fallbackEx)
-            {
-                System.Diagnostics.Debug.WriteLine("No se pudo abrir la carpeta: " + fallbackEx.Message);
-            }
+            catch { /* silencioso */ }
         }
     }
 
