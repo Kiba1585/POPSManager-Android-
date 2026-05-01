@@ -54,6 +54,7 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand DownloadCoversAndMetadataCommand { get; }
     public ICommand RefreshCommand { get; }
     public ICommand RenameAllCommand { get; }
+    public ICommand OpenStorageSettingsCommand { get; }
 
     public string OplRootFolder { get => _oplRootFolder; set => SetProperty(ref _oplRootFolder, value); }
     public string Status { get => _status; set => SetProperty(ref _status, value); }
@@ -71,6 +72,7 @@ public class ProcessPopsViewModel : BindableObject
         DownloadCoversAndMetadataCommand = new Command(async () => await DownloadAllCoversAndMetadata());
         RefreshCommand = new Command(RefreshGameLists);
         RenameAllCommand = new Command(async () => await RenameAllGames());
+        OpenStorageSettingsCommand = new Command(OpenStorageSettings);
 
         RefreshFromSettings();
     }
@@ -106,8 +108,33 @@ public class ProcessPopsViewModel : BindableObject
         }
     }
 
+    private void OpenStorageSettings()
+    {
+        try
+        {
+            var intent = new global::Android.Content.Intent(
+                global::Android.Provider.Settings.ActionManageAllFilesAccessPermission);
+            global::Android.App.Application.Context.StartActivity(intent);
+        }
+        catch { /* no se puede abrir */ }
+    }
+
     private void RefreshGameLists()
     {
+        // Verificar permiso de almacenamiento total (necesario para leer carpetas fuera de la app)
+        if (OperatingSystem.IsAndroidVersionAtLeast(30))
+        {
+            if (!global::Android.OS.Environment.IsExternalStorageManager)
+            {
+                Status = "⚠️ Permiso de almacenamiento no concedido.\n" +
+                         "Pulsa el botón 'Abrir ajustes' para activarlo.";
+                Ps1Games.Clear();
+                Ps2Games.Clear();
+                AppsGames.Clear();
+                return;
+            }
+        }
+
         Ps1Games.Clear();
         Ps2Games.Clear();
         AppsGames.Clear();
@@ -122,7 +149,7 @@ public class ProcessPopsViewModel : BindableObject
             {
                 foreach (var vcd in Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly))
                 {
-                    var entry = BuildGameEntry(vcd, _paths.PopsFolder, isPs1: true);
+                    var entry = BuildGameEntry(vcd, _paths.PopsFolder);
                     Ps1Games.Add(entry);
                 }
             }
@@ -132,7 +159,7 @@ public class ProcessPopsViewModel : BindableObject
             {
                 foreach (var iso in Directory.GetFiles(_paths.DvdFolder, "*.ISO", SearchOption.TopDirectoryOnly))
                 {
-                    var entry = BuildGameEntry(iso, _paths.DvdFolder, isPs1: false);
+                    var entry = BuildGameEntry(iso, _paths.DvdFolder);
                     Ps2Games.Add(entry);
                 }
             }
@@ -160,7 +187,7 @@ public class ProcessPopsViewModel : BindableObject
         }
     }
 
-    private GameEntry BuildGameEntry(string filePath, string parentFolder, bool isPs1)
+    private GameEntry BuildGameEntry(string filePath, string parentFolder)
     {
         string fileName = Path.GetFileName(filePath);
         string gameName = Path.GetFileNameWithoutExtension(filePath);
@@ -353,7 +380,6 @@ public class ProcessPopsViewModel : BindableObject
                     File.Move(game.FilePath, newPath);
                     game.FilePath = newPath;
 
-                    // Renombrar carpeta auxiliar
                     if (Directory.Exists(game.GameFolder))
                     {
                         string newFolderPath = Path.Combine(folder, $"{game.GameId} - {game.Name}");
