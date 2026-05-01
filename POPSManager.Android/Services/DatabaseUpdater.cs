@@ -8,9 +8,9 @@ namespace POPSManager.Android.Services
 {
     public static class DatabaseUpdater
     {
-        // URL fija del ZIP generado por tu proyecto DBGenerator
+        // URL permanente para descargar siempre la última versión de la base de datos
         private const string DefaultDbUrl =
-            "https://github.com/TuUsuario/TuRepo/releases/latest/download/POPSManager_DB.zip";
+            "https://github.com/Kiba1585/POPSManager.DBGenerator/releases/latest/download/POPSManager_DB.zip";
 
         /// <summary>
         /// Descarga el ZIP de la base de datos y lo extrae en la raíz OPL.
