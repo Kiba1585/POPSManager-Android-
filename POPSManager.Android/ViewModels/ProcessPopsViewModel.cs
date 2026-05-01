@@ -488,7 +488,7 @@ public class ProcessPopsViewModel : BindableObject
         return any;
     }
 
-    // ==================== RENOMBRAR JUEGOS ====================
+    // ===================== RENOMBRAR JUEGOS ====================
     private async Task RenameAllGames()
     {
         if (!Ps1Games.Any() && !Ps2Games.Any())
@@ -521,4 +521,64 @@ public class ProcessPopsViewModel : BindableObject
                     renamed++;
                 }
             }
-   
+            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
+        }
+
+        foreach (var game in Ps2Games.ToList())
+        {
+            try
+            {
+                string folder = Path.GetDirectoryName(game.FilePath)!;
+                string newName = $"{game.GameId}.{game.Name}.iso";
+                string newPath = Path.Combine(folder, newName);
+                if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Move(game.FilePath, newPath);
+                    game.FilePath = newPath;
+                    if (Directory.Exists(game.GameFolder))
+                    {
+                        string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
+                        Directory.Move(game.GameFolder, newFolderPath);
+                        game.GameFolder = newFolderPath;
+                    }
+                    renamed++;
+                }
+            }
+            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
+        }
+
+        Ps1Games.Clear();
+        Ps2Games.Clear();
+        RefreshGameLists();
+
+        Status = errors.Any()
+            ? $"Renombrados: {renamed}. Errores: {string.Join("; ", errors)}"
+            : $"{renamed} juegos renombrados.";
+        await Task.CompletedTask;
+    }
+
+    // ==================== MÉTODOS AUXILIARES ====================
+    private async Task<bool> DownloadFileAsync(string url, string destination)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return false;
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await using var fs = new FileStream(destination, FileMode.Create);
+            await response.Content.CopyToAsync(fs);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    protected bool SetProperty<T>(ref T backingStore, T value,
+        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
+    {
+        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
+        backingStore = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+}
