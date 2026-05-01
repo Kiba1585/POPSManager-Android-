@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Maui.Storage;   // para Preferences
+using Microsoft.Maui.Storage;
 
 namespace POPSManager.Android.Services
 {
@@ -19,9 +19,6 @@ namespace POPSManager.Android.Services
         private const string ApiUrl =
             $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
-        /// <summary>
-        /// Descarga la base de datos solo si hay una versión más reciente que la guardada.
-        /// </summary>
         public static async Task<bool> DownloadAndExtractDatabaseAsync(
             string oplRootFolder,
             Action<string>? onProgress = null)
@@ -30,7 +27,6 @@ namespace POPSManager.Android.Services
             {
                 onProgress?.Invoke("Verificando versión de la base de datos...");
 
-                // 1. Obtener información del último release desde GitHub API
                 (string? tag, string? downloadUrl) = await GetLatestReleaseInfoAsync();
                 if (string.IsNullOrEmpty(tag) || string.IsNullOrEmpty(downloadUrl))
                 {
@@ -38,7 +34,6 @@ namespace POPSManager.Android.Services
                     return false;
                 }
 
-                // 2. Comparar con la versión almacenada
                 string? savedVersion = Preferences.Get(DbVersionKey, null);
                 if (savedVersion == tag)
                 {
@@ -46,16 +41,12 @@ namespace POPSManager.Android.Services
                     return true;
                 }
 
-                // 3. Descargar y extraer
                 onProgress?.Invoke($"Descargando base de datos ({tag})...");
 
-                // Usar un nombre de archivo único para evitar conflictos
                 string zipTemp = Path.Combine(Path.GetTempPath(), $"popsmanager_db_{Guid.NewGuid():N}.zip");
-
-                // Eliminar cualquier archivo previo que pudiera estar bloqueado
                 if (File.Exists(zipTemp))
                 {
-                    try { File.Delete(zipTemp); } catch { /* ignorar si falla */ }
+                    try { File.Delete(zipTemp); } catch { }
                 }
 
                 using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
@@ -67,7 +58,6 @@ namespace POPSManager.Android.Services
                 long totalBytes = response.Content.Headers.ContentLength ?? -1;
                 using var stream = await response.Content.ReadAsStreamAsync();
 
-                // Guardar el archivo descargado
                 using (var fileStream = new FileStream(zipTemp, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
                     byte[] buffer = new byte[8192];
@@ -83,24 +73,23 @@ namespace POPSManager.Android.Services
                             onProgress?.Invoke($"Descargando... {percent}%");
                         }
                     }
-                } // El FileStream se cierra aquí
+                }
 
                 onProgress?.Invoke("Extrayendo base de datos...");
 
-                // Extraer en la raíz OPL (sobrescribir si existe)
-                if (File.Exists(zipTemp))
+                // La extracción se ejecuta en un hilo de fondo para no congelar la UI
+                await Task.Run(() =>
                 {
-                    // Asegurar que la carpeta de destino exista
-                    Directory.CreateDirectory(oplRootFolder);
-                    ZipFile.ExtractToDirectory(zipTemp, oplRootFolder, true);
-                }
+                    if (File.Exists(zipTemp))
+                    {
+                        Directory.CreateDirectory(oplRootFolder);
+                        ZipFile.ExtractToDirectory(zipTemp, oplRootFolder, true);
+                    }
+                });
 
-                // Eliminar el archivo temporal después de la extracción
-                try { File.Delete(zipTemp); } catch { /* ignorar si falla */ }
+                try { File.Delete(zipTemp); } catch { }
 
-                // 4. Guardar la versión actual
                 Preferences.Set(DbVersionKey, tag);
-
                 onProgress?.Invoke("Base de datos actualizada correctamente.");
                 return true;
             }
