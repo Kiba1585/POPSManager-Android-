@@ -6,7 +6,17 @@ namespace POPSManager.Core.Logic
 {
     public static class ElfGenerator
     {
-        public static bool GeneratePs1Elf(string baseElfPath, string vcdFullPath, string appsFolder, int discNumber, string cleanTitle, string gameId, Action<string> log)
+        /// <summary>
+        /// Genera un ELF para un juego de PS1.
+        /// </summary>
+        /// <param name="baseElfPath">Ruta del POPSTARTER.ELF original.</param>
+        /// <param name="vcdFullPath">Ruta completa del archivo .VCD.</param>
+        /// <param name="outputElfPath">Ruta completa donde se creará el nuevo .ELF.</param>
+        /// <param name="discNumber">Número de disco (solo se genera para CD1).</param>
+        /// <param name="cleanTitle">Nombre limpio que mostrará OPL.</param>
+        /// <param name="gameId">Game ID del juego.</param>
+        /// <param name="log">Acción para registrar mensajes.</param>
+        public static bool GeneratePs1Elf(string baseElfPath, string vcdFullPath, string outputElfPath, int discNumber, string cleanTitle, string gameId, Action<string> log)
         {
             try
             {
@@ -14,13 +24,18 @@ namespace POPSManager.Core.Logic
                 if (!File.Exists(baseElfPath)) { log("[ELF] ERROR: POPSTARTER.ELF no encontrado."); return false; }
                 if (!File.Exists(vcdFullPath)) { log("[ELF] ERROR: VCD no encontrado."); return false; }
 
-                Directory.CreateDirectory(appsFolder);
-                string elfFileName = $"{gameId} - {cleanTitle}.ELF.NTSC";
-                string outputElf = Path.Combine(appsFolder, elfFileName);
-                string vcdRelativePath = $"mass:/POPS/{Path.GetFileName(Path.GetDirectoryName(vcdFullPath))}/{Path.GetFileName(vcdFullPath)}";
+                // Crear carpeta de destino si no existe
+                string? outputDir = Path.GetDirectoryName(outputElfPath);
+                if (!string.IsNullOrEmpty(outputDir))
+                    Directory.CreateDirectory(outputDir);
 
-                File.Copy(baseElfPath, outputElf, true);
-                using var stream = new FileStream(outputElf, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                // Copiar el ELF base
+                File.Copy(baseElfPath, outputElfPath, true);
+
+                // La ruta del VCD es simplemente el nombre del archivo (porque está directamente en POPS)
+                string vcdRelativePath = $"mass:/POPS/{Path.GetFileName(vcdFullPath)}";
+
+                using var stream = new FileStream(outputElfPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
                 using var writer = new BinaryWriter(stream, Encoding.ASCII, true);
 
                 WriteAsciiFixed(writer, 0x2C, NormalizeAscii(gameId), 10);
