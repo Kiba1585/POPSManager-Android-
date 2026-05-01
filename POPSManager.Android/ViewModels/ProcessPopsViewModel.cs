@@ -79,7 +79,6 @@ public class ProcessPopsViewModel : BindableObject
         RefreshFromSettings();
     }
 
-    // ==================== REFRESCAR ====================
     public void RefreshFromSettings()
     {
         var savedRoot = _settings.DestinationFolder;
@@ -276,6 +275,8 @@ public class ProcessPopsViewModel : BindableObject
         }
 
         await ProcessMultidisc();
+        await GenerateAllElfs();
+        await GenerateAllCheats();
         await DownloadAllCoversAndMetadata();
         Status = "Procesamiento completo.";
         await Task.CompletedTask;
@@ -296,9 +297,11 @@ public class ProcessPopsViewModel : BindableObject
             return;
         }
 
+        // Primero aseguramos el multidisco para tener las carpetas comunes
         await ProcessMultidisc();
 
-        int count = 0;
+        int generated = 0, skipped = 0;
+
         foreach (var game in Ps1Games)
         {
             if (!File.Exists(game.FilePath))
@@ -307,47 +310,54 @@ public class ProcessPopsViewModel : BindableObject
                 continue;
             }
 
+            string elfFileName = $"{Path.GetFileNameWithoutExtension(game.FilePath)}.ELF";
+            string elfPath;
+
             if (game.IsMultiDisc)
             {
-                string elfFileName = $"{Path.GetFileNameWithoutExtension(game.FilePath)}.ELF";
-                string elfPath = Path.Combine(game.GameFolder, elfFileName);
-                if (!File.Exists(elfPath))
-                {
-                    ElfGenerator.GeneratePs1Elf(baseElf, game.FilePath, elfPath, game.DiscNumber, game.Name, game.GameId, msg => _log.Log(msg));
-                    count++;
-                }
-                else
-                    _log.Log($"[ELF] Ya existe: {elfFileName}");
-                continue;
-            }
-
-            // Juego normal
-            string gameAppFolder = Path.Combine(_paths.AppsFolder, game.Name);
-            Directory.CreateDirectory(gameAppFolder);
-            string elfFileNameNormal = $"{Path.GetFileNameWithoutExtension(game.FilePath)}.ELF";
-            string elfPathNormal = Path.Combine(gameAppFolder, elfFileNameNormal);
-
-            if (!File.Exists(elfPathNormal))
-            {
-                ElfGenerator.GeneratePs1Elf(baseElf, game.FilePath, elfPathNormal, game.DiscNumber, game.Name, game.GameId, msg => _log.Log(msg));
-                count++;
+                // La carpeta ya fue asignada por ProcessMultidisc
+                elfPath = Path.Combine(game.GameFolder, elfFileName);
             }
             else
-                _log.Log($"[ELF] Ya existe: {elfFileNameNormal}");
-
-            string titleCfgPath = Path.Combine(gameAppFolder, "title.cfg");
-            try
             {
-                string cfgContent = $"title={game.Name}\nboot={elfFileNameNormal}\n";
-                File.WriteAllText(titleCfgPath, cfgContent);
+                string gameAppFolder = Path.Combine(_paths.AppsFolder, game.Name);
+                Directory.CreateDirectory(gameAppFolder);
+                elfPath = Path.Combine(gameAppFolder, elfFileName);
             }
-            catch (Exception ex)
+
+            if (!File.Exists(elfPath))
             {
-                _log.Log($"[ELF] Error creando title.cfg: {ex.Message}");
+                ElfGenerator.GeneratePs1Elf(baseElf, game.FilePath, elfPath, game.DiscNumber, game.Name, game.GameId, msg => _log.Log(msg));
+                generated++;
+            }
+            else
+            {
+                _log.Log($"[ELF] Ya existe: {elfFileName}");
+                skipped++;
+            }
+
+            // Crear title.cfg si no existe
+            if (!game.IsMultiDisc)
+            {
+                string titleCfgPath = Path.Combine(Path.GetDirectoryName(elfPath)!, "title.cfg");
+                if (!File.Exists(titleCfgPath))
+                {
+                    try
+                    {
+                        string cfgContent = $"title={game.Name}\nboot={elfFileName}\n";
+                        File.WriteAllText(titleCfgPath, cfgContent);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Log($"[ELF] Error creando title.cfg: {ex.Message}");
+                    }
+                }
             }
         }
 
-        Status = count > 0 ? $"{count} ELFs generados." : "No se generaron ELFs (sin VCDs).";
+        Status = generated > 0
+            ? $"{generated} ELFs generados. {skipped} ya existían."
+            : $"No se generaron ELFs. {skipped} ya existían.";
         await Task.CompletedTask;
     }
 
@@ -394,7 +404,7 @@ public class ProcessPopsViewModel : BindableObject
                 }
             }
 
-            // title.cfg para el primer disco
+            // title.cfg para el primer disco (si no existe)
             string titleCfgPath = Path.Combine(commonFolder, "title.cfg");
             if (!File.Exists(titleCfgPath))
             {
@@ -417,14 +427,28 @@ public class ProcessPopsViewModel : BindableObject
         if (_cheatFixSound) extraLines.Add("FIXSOUND=ON");
         if (_cheatFixGraphics) extraLines.Add("FIXGRAPHICS=ON");
 
-        int count = 0;
+        int generated = 0, skipped = 0;
+
         foreach (var game in Ps1Games)
         {
             Directory.CreateDirectory(game.GameFolder);
-            CheatGenerator.GenerateCheatTxt(game.GameId, game.GameFolder, extraLines, msg => _log.Log(msg));
-            count++;
+            string cheatFile = Path.Combine(game.GameFolder, "CHEAT.TXT");
+
+            if (!File.Exists(cheatFile))
+            {
+                CheatGenerator.GenerateCheatTxt(game.GameId, game.GameFolder, extraLines, msg => _log.Log(msg));
+                generated++;
+            }
+            else
+            {
+                _log.Log($"[Cheats] Ya existe: {cheatFile}");
+                skipped++;
+            }
         }
-        Status = count > 0 ? $"{count} CHEAT.TXT generados." : "No hay juegos de PS1 para cheats.";
+
+        Status = generated > 0
+            ? $"{generated} CHEAT.TXT generados. {skipped} ya existían."
+            : $"No se generaron cheats. {skipped} ya existían.";
         await Task.CompletedTask;
     }
 
@@ -439,34 +463,33 @@ public class ProcessPopsViewModel : BindableObject
         }
 
         string mirrorBase = "https://archive.org/download/oplm-art-2023-11";
-        int success = 0;
+        int downloaded = 0, skipped = 0;
+
         for (int i = 0; i < allGames.Count; i++)
         {
             var game = allGames[i];
             MainThread.BeginInvokeOnMainThread(() => Status = $"{i + 1}/{allGames.Count}: {game.Name}");
-            if (await DownloadSingleGameAssetsAsync(game.GameId, game.Name, mirrorBase))
-                success++;
-        }
-        Status = $"Descarga finalizada. {success}/{allGames.Count} juegos actualizados.";
-    }
 
-    private async Task<bool> DownloadSingleGameAssetsAsync(string gameId, string gameName, string mirrorBase)
-    {
-        bool any = false;
-
-        string artFile = Path.Combine(_paths.ArtFolder, gameId + ".jpg");
-        if (!File.Exists(artFile))
-        {
-            string? url = GameDatabase.TryGetCoverUrl(gameId) ?? $"{mirrorBase}/ART/{gameId}.jpg";
-            if (await DownloadFileAsync(url, artFile))
+            string artFile = Path.Combine(_paths.ArtFolder, game.GameId + ".jpg");
+            if (!File.Exists(artFile))
             {
-                try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
-                catch { }
-                any = true;
+                string? url = GameDatabase.TryGetCoverUrl(game.GameId) ?? $"{mirrorBase}/ART/{game.GameId}.jpg";
+                if (await DownloadFileAsync(url, artFile))
+                {
+                    try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
+                    catch { }
+                    downloaded++;
+                }
+            }
+            else
+            {
+                skipped++;
             }
         }
 
-        return any;
+        Status = downloaded > 0
+            ? $"Descargados: {downloaded} covers. {skipped} ya existían."
+            : $"No se descargaron covers. {skipped} ya existían.";
     }
 
     // ==================== RENOMBRAR JUEGOS ====================
@@ -478,7 +501,7 @@ public class ProcessPopsViewModel : BindableObject
             return;
         }
 
-        int renamed = 0;
+        int renamed = 0, skipped = 0;
         var errors = new List<string>();
 
         foreach (var game in Ps1Games.ToList())
@@ -488,19 +511,23 @@ public class ProcessPopsViewModel : BindableObject
                 string folder = Path.GetDirectoryName(game.FilePath)!;
                 string newName = $"{game.GameId}.{game.Name}.VCD";
                 string newPath = Path.Combine(folder, newName);
-                if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    File.Move(game.FilePath, newPath);
-                    game.FilePath = newPath;
 
-                    if (Directory.Exists(game.GameFolder))
-                    {
-                        string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
-                        Directory.Move(game.GameFolder, newFolderPath);
-                        game.GameFolder = newFolderPath;
-                    }
-                    renamed++;
+                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    skipped++;
+                    continue;
                 }
+
+                File.Move(game.FilePath, newPath);
+                game.FilePath = newPath;
+
+                if (Directory.Exists(game.GameFolder))
+                {
+                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
+                    Directory.Move(game.GameFolder, newFolderPath);
+                    game.GameFolder = newFolderPath;
+                }
+                renamed++;
             }
             catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
         }
@@ -512,54 +539,11 @@ public class ProcessPopsViewModel : BindableObject
                 string folder = Path.GetDirectoryName(game.FilePath)!;
                 string newName = $"{game.GameId}.{game.Name}.iso";
                 string newPath = Path.Combine(folder, newName);
-                if (!string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
+
+                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    File.Move(game.FilePath, newPath);
-                    game.FilePath = newPath;
-                    if (Directory.Exists(game.GameFolder))
-                    {
-                        string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
-                        Directory.Move(game.GameFolder, newFolderPath);
-                        game.GameFolder = newFolderPath;
-                    }
-                    renamed++;
+                    skipped++;
+                    continue;
                 }
-            }
-            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
-        }
 
-        Ps1Games.Clear();
-        Ps2Games.Clear();
-        RefreshGameLists();
-
-        Status = errors.Any()
-            ? $"Renombrados: {renamed}. Errores: {string.Join("; ", errors)}"
-            : $"{renamed} juegos renombrados.";
-        await Task.CompletedTask;
-    }
-
-    // ==================== MÉTODOS AUXILIARES ====================
-    private async Task<bool> DownloadFileAsync(string url, string destination)
-    {
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            var response = await client.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return false;
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            await using var fs = new FileStream(destination, FileMode.Create);
-            await response.Content.CopyToAsync(fs);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    protected bool SetProperty<T>(ref T backingStore, T value,
-        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
-    {
-        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
-        backingStore = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-}
+                File.Move(game
