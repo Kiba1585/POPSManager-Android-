@@ -111,7 +111,6 @@ public class PathsServiceAndroid : IPathsService
             intent.AddFlags(ActivityFlags.GrantReadUriPermission);
             intent.AddFlags(ActivityFlags.NewTask);
 
-            // Convertir la ruta a una URI de contenido (Android 11+)
             if (global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.R)
             {
                 var uri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/primary%3A" +
@@ -123,7 +122,7 @@ public class PathsServiceAndroid : IPathsService
         }
         catch
         {
-            // Fallback: intentar con un intent genérico
+            // Fallback genérico
             try
             {
                 var intent = new Intent(Intent.ActionView);
