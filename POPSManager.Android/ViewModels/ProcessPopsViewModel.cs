@@ -490,4 +490,137 @@ public class ProcessPopsViewModel : BindableObject
                 if (internalDbExists)
                 {
                     string srcCfgFile = Path.Combine(sourceCfgFolder, game.GameId + ".cfg");
-       
+                    if (File.Exists(srcCfgFile))
+                    {
+                        try
+                        {
+                            File.Copy(srcCfgFile, destCfgFile);
+                            metaCopied++;
+                        }
+                        catch { _log.Log($"[Meta] Error copiando {game.GameId}.cfg"); }
+                    }
+                    else
+                    {
+                        _log.Log($"[Meta] No encontrado en base de datos: {game.GameId} (archivo esperado: {srcCfgFile})");
+                    }
+                }
+                else
+                {
+                    _log.Log("[Meta] Base de datos interna no encontrada. Usa 'Actualizar BD' primero.");
+                }
+            }
+            else { metaSkipped++; }
+        }
+
+        string msg = $"Covers: {coversDownloaded} descargados, {coversSkipped} ya existían.\n" +
+                     $"Metadatos: {metaCopied} copiados, {metaSkipped} ya existían.\n" +
+                     $"Ruta ART: {artFolder}\nRuta CFG: {cfgFolder}";
+        if (!internalDbExists) msg += "\n⚠️ Actualiza la base de datos primero.";
+        Status = msg;
+
+        GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
+    }
+
+    /// <summary> Comprueba si una carpeta permite escritura. </summary>
+    private bool TestWrite(string folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        {
+            try { Directory.CreateDirectory(folder); } catch { return false; }
+        }
+        try
+        {
+            string testFile = Path.Combine(folder, ".writetest");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    // ==================== RENOMBRAR JUEGOS ====================
+    private async Task RenameAllGames()
+    {
+        if (!Ps1Games.Any() && !Ps2Games.Any()) { Status = "No hay juegos para renombrar."; return; }
+
+        int renamed = 0, skipped = 0;
+        var errors = new List<string>();
+
+        foreach (var game in Ps1Games.ToList())
+        {
+            try
+            {
+                string folder = Path.GetDirectoryName(game.FilePath)!;
+                string newName = $"{game.GameId}.{game.Name}.VCD";
+                string newPath = Path.Combine(folder, newName);
+                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
+
+                File.Move(game.FilePath, newPath);
+                game.FilePath = newPath;
+                if (Directory.Exists(game.GameFolder))
+                {
+                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
+                    Directory.Move(game.GameFolder, newFolderPath);
+                    game.GameFolder = newFolderPath;
+                }
+                renamed++;
+            }
+            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
+        }
+
+        foreach (var game in Ps2Games.ToList())
+        {
+            try
+            {
+                string folder = Path.GetDirectoryName(game.FilePath)!;
+                string newName = $"{game.GameId}.{game.Name}.iso";
+                string newPath = Path.Combine(folder, newName);
+                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
+
+                File.Move(game.FilePath, newPath);
+                game.FilePath = newPath;
+                if (Directory.Exists(game.GameFolder))
+                {
+                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
+                    Directory.Move(game.GameFolder, newFolderPath);
+                    game.GameFolder = newFolderPath;
+                }
+                renamed++;
+            }
+            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
+        }
+
+        Ps1Games.Clear(); Ps2Games.Clear();
+        RefreshGameLists();
+
+        string result = $"Renombrados: {renamed}. Omitidos: {skipped} (ya tenían el formato).";
+        if (errors.Any()) result += $" Errores: {string.Join("; ", errors)}";
+        Status = result;
+        await Task.CompletedTask;
+    }
+
+    // ==================== MÉTODOS AUXILIARES ====================
+    private async Task<bool> DownloadFileAsync(string url, string destination)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return false;
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await using var fs = new FileStream(destination, FileMode.Create);
+            await response.Content.CopyToAsync(fs);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    protected bool SetProperty<T>(ref T backingStore, T value,
+        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
+    {
+        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
+        backingStore = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+}
