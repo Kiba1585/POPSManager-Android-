@@ -57,7 +57,23 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand OpenStorageSettingsCommand { get; }
     public ICommand UpdateDatabaseCommand { get; }
 
-    public string OplRootFolder { get => _oplRootFolder; set => SetProperty(ref _oplRootFolder, value); }
+    public string OplRootFolder
+    {
+        get => _oplRootFolder;
+        set
+        {
+            // Sanitizar: eliminar espacios al inicio y final
+            string sanitized = value?.Trim() ?? "";
+            if (_oplRootFolder != sanitized)
+            {
+                _oplRootFolder = sanitized;
+                OnPropertyChanged(nameof(OplRootFolder));
+                // También actualizamos la raíz en PathsServiceAndroid
+                if (_paths is PathsServiceAndroid androidPaths)
+                    androidPaths.RootFolder = sanitized;
+            }
+        }
+    }
     public string Status { get => _status; set => SetProperty(ref _status, value); }
 
     public ProcessPopsViewModel(IPathsService paths, ILoggingService log, SettingsService settings)
@@ -87,12 +103,12 @@ public class ProcessPopsViewModel : BindableObject
         {
             if (savedRoot != _oplRootFolder)
             {
-                _oplRootFolder = savedRoot;
+                OplRootFolder = savedRoot; // el setter sanitiza
                 OnPropertyChanged(nameof(OplRootFolder));
-                if (_paths is PathsServiceAndroid androidPaths) androidPaths.RootFolder = savedRoot;
+                if (_paths is PathsServiceAndroid androidPaths) androidPaths.RootFolder = OplRootFolder;
             }
             RefreshGameLists();
-            Status = $"Raíz OPL: {savedRoot}";
+            Status = $"Raíz OPL: {OplRootFolder}";
             GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
         }
         else Status = "Selecciona la carpeta raíz OPL (desde Inicio o aquí).";
@@ -107,7 +123,7 @@ public class ProcessPopsViewModel : BindableObject
             _settings.RootFolder = path;
             await _settings.SaveAsync();
             OplRootFolder = path;
-            if (_paths is PathsServiceAndroid androidPaths) androidPaths.RootFolder = path;
+            if (_paths is PathsServiceAndroid androidPaths) androidPaths.RootFolder = OplRootFolder;
             RefreshGameLists();
             GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
         }
@@ -124,7 +140,6 @@ public class ProcessPopsViewModel : BindableObject
         catch { }
     }
 
-    // ==================== ACTUALIZAR BASE DE DATOS ====================
     private async Task UpdateDatabase()
     {
         var allGameIds = Ps1Games.Select(g => g.GameId)
@@ -205,7 +220,7 @@ public class ProcessPopsViewModel : BindableObject
             else if (upper.Contains("CD4") || upper.Contains("DISC4")) discNumber = 4;
         }
         string cleanTitle = OplCompatibleTitle(fileName, discNumber, multiDisc);
-        string gameId = ExtractGameId(filePath);
+        string gameId = NormalizeGameId(filePath);   // Normalizar para la búsqueda
         return new GameEntry { Name = cleanTitle, FilePath = filePath, GameFolder = companionFolder, GameId = gameId, IsMultiDisc = multiDisc, DiscNumber = discNumber };
     }
 
@@ -223,9 +238,23 @@ public class ProcessPopsViewModel : BindableObject
         return title.Replace(' ', '_').Replace("'", "").Replace(":", "").Trim();
     }
 
+    /// <summary> Obtiene un Game ID normalizado para buscar en la base de datos (sin puntos ni guiones extras). </summary>
+    private string NormalizeGameId(string path)
+    {
+        string raw = ExtractGameId(path);
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        // Eliminar puntos y convertir a mayúsculas, manteniendo solo letras, dígitos y guiones bajos
+        string normalized = new string(raw.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray());
+        return normalized;
+    }
+
     private string ExtractGameId(string path)
     {
-        try { var id = GameIdDetector.DetectGameId(path); if (!string.IsNullOrWhiteSpace(id)) return id; }
+        try
+        {
+            var id = GameIdDetector.DetectGameId(path);
+            if (!string.IsNullOrWhiteSpace(id)) return id;
+        }
         catch { }
         return GameIdDetector.DetectFromName(Path.GetFileNameWithoutExtension(path));
     }
@@ -428,6 +457,9 @@ public class ProcessPopsViewModel : BindableObject
         string sourceCfgFolder = Path.Combine(DatabaseUpdater.InternalDatabaseFolder, "CFG");
         bool internalDbExists = Directory.Exists(sourceCfgFolder);
 
+        var sampleIds = allGames.Take(3).Select(g => g.GameId).ToList();
+        Status = $"IDs de ejemplo: {string.Join(", ", sampleIds)}";
+
         for (int i = 0; i < allGames.Count; i++)
         {
             var game = allGames[i];
@@ -446,7 +478,7 @@ public class ProcessPopsViewModel : BindableObject
                 }
                 else
                 {
-                    _log.Log($"[Cover] No disponible para {game.Name}");
+                    _log.Log($"[Cover] No disponible para {game.Name} (ID:{game.GameId})");
                 }
             }
             else { coversSkipped++; }
@@ -458,137 +490,4 @@ public class ProcessPopsViewModel : BindableObject
                 if (internalDbExists)
                 {
                     string srcCfgFile = Path.Combine(sourceCfgFolder, game.GameId + ".cfg");
-                    if (File.Exists(srcCfgFile))
-                    {
-                        try
-                        {
-                            File.Copy(srcCfgFile, destCfgFile);
-                            metaCopied++;
-                        }
-                        catch { _log.Log($"[Meta] Error copiando {game.GameId}.cfg"); }
-                    }
-                    else
-                    {
-                        _log.Log($"[Meta] No encontrado en base de datos: {game.GameId}");
-                    }
-                }
-                else
-                {
-                    _log.Log("[Meta] Base de datos interna no encontrada. Usa 'Actualizar BD' primero.");
-                }
-            }
-            else { metaSkipped++; }
-        }
-
-        string msg = $"Covers: {coversDownloaded} descargados, {coversSkipped} ya existían.\n" +
-                     $"Metadatos: {metaCopied} copiados, {metaSkipped} ya existían.\n" +
-                     $"Ruta ART: {artFolder}\nRuta CFG: {cfgFolder}";
-        if (!internalDbExists) msg += "\n⚠️ Actualiza la base de datos primero.";
-        Status = msg;
-
-        GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
-    }
-
-    /// <summary> Comprueba si una carpeta permite escritura. </summary>
-    private bool TestWrite(string folder)
-    {
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
-        {
-            try { Directory.CreateDirectory(folder); } catch { return false; }
-        }
-        try
-        {
-            string testFile = Path.Combine(folder, ".writetest");
-            File.WriteAllText(testFile, "test");
-            File.Delete(testFile);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    // ==================== RENOMBRAR JUEGOS ====================
-    private async Task RenameAllGames()
-    {
-        if (!Ps1Games.Any() && !Ps2Games.Any()) { Status = "No hay juegos para renombrar."; return; }
-
-        int renamed = 0, skipped = 0;
-        var errors = new List<string>();
-
-        foreach (var game in Ps1Games.ToList())
-        {
-            try
-            {
-                string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId}.{game.Name}.VCD";
-                string newPath = Path.Combine(folder, newName);
-                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
-
-                File.Move(game.FilePath, newPath);
-                game.FilePath = newPath;
-                if (Directory.Exists(game.GameFolder))
-                {
-                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
-                    Directory.Move(game.GameFolder, newFolderPath);
-                    game.GameFolder = newFolderPath;
-                }
-                renamed++;
-            }
-            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
-        }
-
-        foreach (var game in Ps2Games.ToList())
-        {
-            try
-            {
-                string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId}.{game.Name}.iso";
-                string newPath = Path.Combine(folder, newName);
-                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
-
-                File.Move(game.FilePath, newPath);
-                game.FilePath = newPath;
-                if (Directory.Exists(game.GameFolder))
-                {
-                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
-                    Directory.Move(game.GameFolder, newFolderPath);
-                    game.GameFolder = newFolderPath;
-                }
-                renamed++;
-            }
-            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
-        }
-
-        Ps1Games.Clear(); Ps2Games.Clear();
-        RefreshGameLists();
-
-        string result = $"Renombrados: {renamed}. Omitidos: {skipped} (ya tenían el formato).";
-        if (errors.Any()) result += $" Errores: {string.Join("; ", errors)}";
-        Status = result;
-        await Task.CompletedTask;
-    }
-
-    // ==================== MÉTODOS AUXILIARES ====================
-    private async Task<bool> DownloadFileAsync(string url, string destination)
-    {
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            var response = await client.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return false;
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            await using var fs = new FileStream(destination, FileMode.Create);
-            await response.Content.CopyToAsync(fs);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    protected bool SetProperty<T>(ref T backingStore, T value,
-        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
-    {
-        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
-        backingStore = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-}
+       
