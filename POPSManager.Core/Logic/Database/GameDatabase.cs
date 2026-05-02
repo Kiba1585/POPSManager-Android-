@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Text.Json;
 using POPSManager.Core.Models;
 
@@ -9,40 +8,41 @@ namespace POPSManager.Core.Logic
 {
     public static class GameDatabase
     {
-        private static readonly Dictionary<string, GameEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
-        private static bool _initialized;
+        private static Dictionary<string, GameEntry>? _entries;
+        private static readonly object _lock = new();
 
-        public static void Initialize()
+        public static void Initialize(string dataFolder)
         {
-            if (_initialized) return;
-            _initialized = true;
+            if (_entries != null) return;
+            lock (_lock)
+            {
+                if (_entries != null) return;
+                _entries = new Dictionary<string, GameEntry>(StringComparer.OrdinalIgnoreCase);
 
-            LoadEmbeddedJson("POPSManager.Core.Data.ps1db.json");
-            LoadEmbeddedJson("POPSManager.Core.Data.ps2db.json");
+                LoadJson(Path.Combine(dataFolder, "ps1db.json"));
+                LoadJson(Path.Combine(dataFolder, "ps2db.json"));
+            }
         }
 
-        private static void LoadEmbeddedJson(string resourceName)
+        private static void LoadJson(string path)
         {
-            var asm = Assembly.GetExecutingAssembly();
-            using var stream = asm.GetManifestResourceStream(resourceName);
-            if (stream == null) return;
-
-            using var reader = new StreamReader(stream);
-            var json = reader.ReadToEnd();
-            var dict = JsonSerializer.Deserialize<Dictionary<string, GameEntry>>(json);
-            if (dict != null)
+            if (!File.Exists(path)) return;
+            try
             {
-                foreach (var kvp in dict)
+                string json = File.ReadAllText(path);
+                var dict = JsonSerializer.Deserialize<Dictionary<string, GameEntry>>(json);
+                if (dict != null)
                 {
-                    if (!_entries.ContainsKey(kvp.Key))
-                        _entries[kvp.Key] = kvp.Value;
+                    foreach (var kvp in dict)
+                        _entries!.TryAdd(kvp.Key, kvp.Value);
                 }
             }
+            catch { }
         }
 
         public static bool TryGetEntry(string gameId, out GameEntry? entry)
         {
-            Initialize();
+            _entries ??= new Dictionary<string, GameEntry>();
             return _entries.TryGetValue(gameId, out entry);
         }
 
