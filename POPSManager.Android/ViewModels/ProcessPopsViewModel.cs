@@ -483,4 +483,12 @@ public class ProcessPopsViewModel : BindableObject
         catch { return false; }
     }
 
-    protected bool SetProperty<T>(re
+    protected bool SetProperty<T>(ref T backingStore, T value,
+        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
+    {
+        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
+        backingStore = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+}
