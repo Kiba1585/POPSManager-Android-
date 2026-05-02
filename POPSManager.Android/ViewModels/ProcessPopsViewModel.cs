@@ -28,7 +28,7 @@ public class ProcessPopsViewModel : BindableObject
     {
         public string GameId { get; set; } = "";          // ID normalizado (sin puntos)
         public string OriginalGameId { get; set; } = "";  // ID original (con puntos)
-        public string Name { get; set; } = "";            // nombre limpio sin región/idiomas/crack
+        public string Name { get; set; } = "";            // nombre limpio sin región/idiomas/crack (posiblemente abreviado)
         public string FilePath { get; set; } = "";        // ruta al .VCD o .ISO
         public string GameFolder { get; set; } = "";      // carpeta auxiliar
         public bool IsMultiDisc { get; set; }
@@ -98,7 +98,7 @@ public class ProcessPopsViewModel : BindableObject
         var savedRoot = _settings.DestinationFolder;
         if (!string.IsNullOrEmpty(savedRoot))
         {
-            OplRootFolder = savedRoot;
+            OplRootFolder = savedRoot;   // sanitiza y propaga
             RefreshGameLists();
             Status = $"Raíz OPL: {_oplRootFolder}";
             GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
@@ -114,7 +114,7 @@ public class ProcessPopsViewModel : BindableObject
             _settings.DestinationFolder = path;
             _settings.RootFolder = path;
             await _settings.SaveAsync();
-            OplRootFolder = path;
+            OplRootFolder = path;       // sanitiza y propaga
             RefreshGameLists();
             GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
         }
@@ -227,12 +227,12 @@ public class ProcessPopsViewModel : BindableObject
         };
     }
 
-    /// <summary> Limpia el nombre del juego para mostrar en OPL: elimina Game ID, región, idiomas, crack y caracteres especiales. </summary>
+    /// <summary> Limpia y opcionalmente abrevia el nombre para OPL. </summary>
     private string OplCompatibleTitle(string rawName, int discNumber, bool multiDisc)
     {
         string title = rawName;
 
-        // 1. Eliminar Game ID del principio (formatos: "GAMEID - ", "GAMEID ", "GAMEID.")
+        // 1. Eliminar Game ID del principio
         int dashIndex = title.IndexOf(" - ");
         if (dashIndex > 0) { title = title.Substring(dashIndex + 3).Trim(); }
         else if (title.Contains(' '))
@@ -248,26 +248,56 @@ public class ProcessPopsViewModel : BindableObject
                 title = title.Substring(firstDot + 1).Trim();
         }
 
-        // 2. Eliminar etiquetas entre paréntesis que empiecen con: Europe, USA, Japan, En, Fr, De, Es, It, etc.
-        title = Regex.Replace(title, @"\s*\(?(Europe|USA|Japan|Asia|World|En|Fr|De|Es|It|Pt|Ja|Ko|Zh|Ru|Nl|Sv|No|Da|Fi|Pl|Cz|Hu|Tr|Gr|Ar|He|Crack|Fix|Trainer|Hack)\)?\s*",
-                              "", RegexOptions.IgnoreCase);
+        // 2. Eliminar cualquier paréntesis con contenido (excepto "(CDx)")
+        title = Regex.Replace(title, @"\s*\((?!CD\d)[^)]*\)\s*", " ", RegexOptions.IgnoreCase);
 
-        // 3. Reemplazar caracteres no deseados
+        // 3. Limpiar caracteres problemáticos
         title = title
-            .Replace(' ', '_')
             .Replace("'", "")
             .Replace(":", "")
             .Replace("[", "").Replace("]", "")
-            .Trim();
+            .Replace(",,", ",")
+            .Replace(",,", ",")
+            .Replace(",", "");
 
-        // 4. Eliminar guiones bajos múltiples
-        title = Regex.Replace(title, @"_+", "_").Trim('_');
+        // 4. Reemplazar espacios/guiones bajos múltiples por un solo guion bajo
+        title = Regex.Replace(title, @"[\s_]+", "_").Trim('_');
 
         // 5. Añadir número de disco si es multidisco
         if (multiDisc && discNumber > 1)
             title += $" (CD{discNumber})";
 
+        // 6. Abreviar si el título es demasiado largo (límite típico de OPL: 32 caracteres)
+        title = AbbreviateIfTooLong(title, 32);
+
         return title;
+    }
+
+    /// <summary> Abrevia un título largo usando las iniciales de las primeras palabras,
+    /// conservando el subtítulo después de " - " si existe. </summary>
+    private string AbbreviateIfTooLong(string title, int maxLength = 32)
+    {
+        if (title.Length <= maxLength) return title;
+
+        // Separar por " - " si existe
+        int dashPos = title.IndexOf(" - ");
+        string basePart = dashPos > 0 ? title.Substring(0, dashPos).Trim() : title;
+        string subPart = dashPos > 0 ? title.Substring(dashPos + 3).Trim() : "";
+
+        // Dividir la parte base en palabras
+        var words = basePart.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length <= 1) return title; // no se puede abreviar una sola palabra
+
+        // Crear siglas (primera letra de cada palabra)
+        string abbreviation = string.Concat(words.Select(w => char.ToUpper(w[0])));
+
+        // Reconstruir el título abreviado
+        string result = string.IsNullOrEmpty(subPart)
+            ? abbreviation
+            : $"{abbreviation} - {subPart}";
+
+        // Si aún es demasiado largo, truncar forzosamente
+        return result.Length <= maxLength ? result : result.Substring(0, maxLength).Trim();
     }
 
     private string NormalizeGameId(string rawId)
@@ -377,7 +407,6 @@ public class ProcessPopsViewModel : BindableObject
             if (discs.Count <= 1) continue;
 
             string baseFolderName = discs.First().Name;
-            // Eliminar "(CD1)" etc.
             baseFolderName = Regex.Replace(baseFolderName, @"\s*\(CD\d\)", "").Trim();
             string commonFolder = Path.Combine(Path.GetDirectoryName(discs.First().FilePath)!, baseFolderName);
             Directory.CreateDirectory(commonFolder);
@@ -449,17 +478,33 @@ public class ProcessPopsViewModel : BindableObject
 
         string artFolder = _paths.ArtFolder;
         string cfgFolder = _paths.CfgFolder;
+
         Status = $"ART: {artFolder}\nCFG: {cfgFolder}\nVerificando permisos...";
+
         if (!TestWrite(artFolder) || !TestWrite(cfgFolder))
         {
-            Status = $"❌ Sin permisos de escritura en:\n  ART: {artFolder}\n  CFG: {cfgFolder}\nUsa 'Abrir ajustes de almacenamiento' y activa el permiso.";
+            Status = $"❌ Sin permisos de escritura en:\n  ART: {artFolder}\n  CFG: {cfgFolder}\n" +
+                     "Usa 'Abrir ajustes de almacenamiento' y activa el permiso.";
+            return;
+        }
+
+        // Mostrar info de caché interna
+        string sourceCfgFolder = Path.Combine(DatabaseUpdater.InternalDatabaseFolder, "CFG");
+        bool internalDbExists = Directory.Exists(sourceCfgFolder);
+        if (internalDbExists)
+        {
+            var cfgFiles = Directory.GetFiles(sourceCfgFolder, "*.cfg");
+            Status = $"Caché interna: {cfgFiles.Length} archivos CFG.\n" +
+                     $"Ejemplo: {Path.GetFileName(cfgFiles.FirstOrDefault() ?? "")}";
+        }
+        else
+        {
+            Status = "La caché interna no existe. Usa 'Actualizar BD' primero.";
             return;
         }
 
         int coversDownloaded = 0, coversSkipped = 0, metaCopied = 0, metaSkipped = 0;
         string mirrorBase = "https://archive.org/download/oplm-art-2023-11";
-        string sourceCfgFolder = Path.Combine(DatabaseUpdater.InternalDatabaseFolder, "CFG");
-        bool internalDbExists = Directory.Exists(sourceCfgFolder);
 
         for (int i = 0; i < allGames.Count; i++)
         {
@@ -470,14 +515,18 @@ public class ProcessPopsViewModel : BindableObject
             string artFile = Path.Combine(artFolder, game.OriginalGameId + ".jpg");
             if (!File.Exists(artFile))
             {
-                string? url = GameDatabase.TryGetCoverUrl(game.OriginalGameId) ?? $"{mirrorBase}/ART/{game.OriginalGameId}.jpg";
-                if (await DownloadFileAsync(url, artFile))
+                string? url = GameDatabase.TryGetCoverUrl(game.OriginalGameId);
+                if (url != null)
                 {
-                    try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
-                    catch { }
-                    coversDownloaded++;
+                    if (await DownloadFileAsync(url, artFile))
+                    {
+                        try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
+                        catch { }
+                        coversDownloaded++;
+                    }
+                    else _log.Log($"[Cover] Falló la descarga desde {url}");
                 }
-                else _log.Log($"[Cover] No disponible para {game.Name} (ID:{game.OriginalGameId})");
+                else _log.Log($"[Cover] No hay URL para {game.OriginalGameId}");
             }
             else coversSkipped++;
 
@@ -485,18 +534,10 @@ public class ProcessPopsViewModel : BindableObject
             string destCfgFile = Path.Combine(cfgFolder, game.OriginalGameId + ".cfg");
             if (!File.Exists(destCfgFile))
             {
-                if (internalDbExists)
-                {
-                    string? copied = TryCopyCfg(sourceCfgFolder, cfgFolder, game.OriginalGameId)
-                                 ?? TryCopyCfg(sourceCfgFolder, cfgFolder, game.GameId);
-                    if (copied != null) metaCopied++;
-                    else _log.Log($"[Meta] No encontrado: {game.OriginalGameId} ni {game.GameId}");
-                }
-                else
-                {
-                    _log.Log("[Meta] Base de datos interna no encontrada. Usa 'Actualizar BD' primero.");
-                    break;
-                }
+                string? copied = TryCopyCfg(sourceCfgFolder, cfgFolder, game.OriginalGameId)
+                             ?? TryCopyCfg(sourceCfgFolder, cfgFolder, game.GameId);
+                if (copied != null) metaCopied++;
+                else _log.Log($"[Meta] No encontrado en caché: {game.OriginalGameId} ni {game.GameId}");
             }
             else metaSkipped++;
         }
@@ -504,7 +545,6 @@ public class ProcessPopsViewModel : BindableObject
         string msg = $"Covers: {coversDownloaded} descargados, {coversSkipped} ya existían.\n" +
                      $"Metadatos: {metaCopied} copiados, {metaSkipped} ya existían.\n" +
                      $"Ruta ART: {artFolder}\nRuta CFG: {cfgFolder}";
-        if (!internalDbExists) msg += "\n⚠️ Actualiza la base de datos primero.";
         Status = msg;
         GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
     }
@@ -537,7 +577,7 @@ public class ProcessPopsViewModel : BindableObject
         catch { return false; }
     }
 
-    // ==================== RENOMBRAR JUEGOS ====================
+    // ==================== RENOMBRAR JUEGOS (ahora con abreviación automática) ====================
     private async Task RenameAllGames()
     {
         if (!Ps1Games.Any() && !Ps2Games.Any()) { Status = "No hay juegos para renombrar."; return; }
@@ -551,6 +591,7 @@ public class ProcessPopsViewModel : BindableObject
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
                 string discSuffix = game.IsMultiDisc && game.DiscNumber > 1 ? $" (CD{game.DiscNumber})" : "";
+                // El nombre ya viene limpio y posiblemente abreviado desde OplCompatibleTitle
                 string newName = $"{game.OriginalGameId}.{game.Name}{discSuffix}.VCD";
                 string newPath = Path.Combine(folder, newName);
                 if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
