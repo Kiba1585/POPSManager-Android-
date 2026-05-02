@@ -19,9 +19,10 @@ public class PathsServiceAndroid : IPathsService
         get => _rootFolder;
         set
         {
-            if (_rootFolder != value)
+            string sanitized = value?.Trim() ?? "";
+            if (_rootFolder != sanitized)
             {
-                _rootFolder = value;
+                _rootFolder = sanitized;
                 EnsureOplFoldersExist();
             }
         }
@@ -33,17 +34,9 @@ public class PathsServiceAndroid : IPathsService
     public string ArtFolder => Path.Combine(RootFolder, "ART");
     public string DvdFolder => Path.Combine(RootFolder, "DVD");
 
-    // POPSTARTER.ELF: se busca primero en la raíz OPL, luego en POPS (por si acaso)
     public string PopstarterElfPath
     {
-        get
-        {
-            string rootElf = Path.Combine(RootFolder, "POPSTARTER.ELF");
-            if (File.Exists(rootElf)) return rootElf;
-            string popsElf = Path.Combine(PopsFolder, "POPSTARTER.ELF");
-            if (File.Exists(popsElf)) return popsElf;
-            return rootElf; // devuelve la ruta estándar aunque no exista
-        }
+        get => Path.Combine(RootFolder, "POPSTARTER.ELF");
         set { /* ignorado en Android */ }
     }
     public string PopstarterPs2ElfPath { get; set; } = "";
@@ -113,33 +106,32 @@ public class PathsServiceAndroid : IPathsService
         try
         {
             var context = global::Android.App.Application.Context;
+            var packageManager = context.PackageManager;
+            if (packageManager is null) return;
 
-            var intent = new Intent(Intent.ActionOpenDocumentTree);
+            var androidUri = AndroidX.Core.Content.FileProvider.GetUriForFile(
+                context,
+                context.PackageName + ".fileprovider",
+                new Java.IO.File(folderPath));
+
+            var intent = new Intent(Intent.ActionView);
+            intent.SetDataAndType(androidUri, "resource/folder");
             intent.AddFlags(ActivityFlags.GrantReadUriPermission);
             intent.AddFlags(ActivityFlags.NewTask);
 
-            if (global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.R)
+            if (intent.ResolveActivity(packageManager) == null)
             {
-                var uri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/primary%3A" +
-                    folderPath.Replace("/storage/emulated/0/", "").Replace("/", "%2F"));
-                intent.PutExtra("android.provider.extra.INITIAL_URI", uri);
+                var docUri = AndroidUri.Parse(
+                    "content://com.android.externalstorage.documents/tree/" +
+                    folderPath.Replace("/storage/emulated/0/", "primary%3A"));
+                intent.SetDataAndType(docUri, "resource/folder");
             }
 
             context.StartActivity(intent);
         }
-        catch
+        catch (Exception ex)
         {
-            try
-            {
-                var intent = new Intent(Intent.ActionView);
-                var uri = AndroidUri.Parse("content://com.android.externalstorage.documents/tree/" +
-                    folderPath.Replace("/storage/emulated/0/", "primary%3A"));
-                intent.SetDataAndType(uri, "resource/folder");
-                intent.AddFlags(ActivityFlags.GrantReadUriPermission);
-                intent.AddFlags(ActivityFlags.NewTask);
-                global::Android.App.Application.Context.StartActivity(intent);
-            }
-            catch { }
+            System.Diagnostics.Debug.WriteLine("No se pudo abrir la carpeta: " + ex.Message);
         }
     }
 
