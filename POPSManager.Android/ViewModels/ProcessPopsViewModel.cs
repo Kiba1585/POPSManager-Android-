@@ -79,6 +79,7 @@ public class ProcessPopsViewModel : BindableObject
         RefreshFromSettings();
     }
 
+    // ==================== REFRESCAR ====================
     public void RefreshFromSettings()
     {
         var savedRoot = _settings.DestinationFolder;
@@ -92,6 +93,9 @@ public class ProcessPopsViewModel : BindableObject
             }
             RefreshGameLists();
             Status = $"Raíz OPL: {savedRoot}";
+
+            // Inicializar la base de datos local desde la raíz OPL
+            GameDatabase.Initialize(savedRoot);
         }
         else Status = "Selecciona la carpeta raíz OPL (desde Inicio o aquí).";
     }
@@ -107,6 +111,7 @@ public class ProcessPopsViewModel : BindableObject
             OplRootFolder = path;
             if (_paths is PathsServiceAndroid androidPaths) androidPaths.RootFolder = path;
             RefreshGameLists();
+            GameDatabase.Initialize(path);
         }
     }
 
@@ -123,10 +128,19 @@ public class ProcessPopsViewModel : BindableObject
 
     private async Task UpdateDatabase()
     {
+        // Recolectar todos los Game IDs de los juegos presentes
+        var allGameIds = Ps1Games.Select(g => g.GameId)
+                        .Concat(Ps2Games.Select(g => g.GameId))
+                        .Where(id => !string.IsNullOrWhiteSpace(id));
+
         await DatabaseUpdater.DownloadAndExtractDatabaseAsync(
             _paths.RootFolder,
+            allGameIds,
             msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
         );
+
+        // Tras actualizar la base de datos, volvemos a inicializar GameDatabase por si hay nuevos JSON
+        GameDatabase.Initialize(_paths.RootFolder);
     }
 
     private void RefreshGameLists()
@@ -297,7 +311,6 @@ public class ProcessPopsViewModel : BindableObject
             return;
         }
 
-        // Primero aseguramos el multidisco para tener las carpetas comunes
         await ProcessMultidisc();
 
         int generated = 0, skipped = 0;
@@ -315,7 +328,6 @@ public class ProcessPopsViewModel : BindableObject
 
             if (game.IsMultiDisc)
             {
-                // La carpeta ya fue asignada por ProcessMultidisc
                 elfPath = Path.Combine(game.GameFolder, elfFileName);
             }
             else
@@ -336,7 +348,6 @@ public class ProcessPopsViewModel : BindableObject
                 skipped++;
             }
 
-            // Crear title.cfg si no existe
             if (!game.IsMultiDisc)
             {
                 string titleCfgPath = Path.Combine(Path.GetDirectoryName(elfPath)!, "title.cfg");
@@ -347,10 +358,7 @@ public class ProcessPopsViewModel : BindableObject
                         string cfgContent = $"title={game.Name}\nboot={elfFileName}\n";
                         File.WriteAllText(titleCfgPath, cfgContent);
                     }
-                    catch (Exception ex)
-                    {
-                        _log.Log($"[ELF] Error creando title.cfg: {ex.Message}");
-                    }
+                    catch (Exception ex) { _log.Log($"[ELF] Error creando title.cfg: {ex.Message}"); }
                 }
             }
         }
@@ -361,7 +369,6 @@ public class ProcessPopsViewModel : BindableObject
         await Task.CompletedTask;
     }
 
-    // ==================== PROCESAR MULTIDISCO ====================
     private async Task ProcessMultidisc()
     {
         var ps1Groups = Ps1Games
@@ -374,12 +381,10 @@ public class ProcessPopsViewModel : BindableObject
             var discs = group.OrderBy(g => g.DiscNumber).ToList();
             if (discs.Count <= 1) continue;
 
-            // Carpeta común
             string baseFolderName = discs.First().Name.Replace(" (CD1)", "").Replace(" (CD2)", "").Replace(" (CD3)", "").Replace(" (CD4)", "").Trim();
             string commonFolder = Path.Combine(Path.GetDirectoryName(discs.First().FilePath)!, baseFolderName);
             Directory.CreateDirectory(commonFolder);
 
-            // DISCS.TXT
             string discsTxtPath = Path.Combine(commonFolder, "DISCS.TXT");
             var discNames = discs.Select(d => Path.GetFileName(d.FilePath)).ToList();
             if (!File.Exists(discsTxtPath))
@@ -388,7 +393,6 @@ public class ProcessPopsViewModel : BindableObject
                 _log.Log($"[Multidisco] Creado {discsTxtPath}");
             }
 
-            // ELFs para todos los discos
             string baseElf = _paths.PopstarterElfPath;
             if (File.Exists(baseElf))
             {
@@ -398,19 +402,15 @@ public class ProcessPopsViewModel : BindableObject
                     string elfFileName = $"{Path.GetFileNameWithoutExtension(disc.FilePath)}.ELF";
                     string elfPath = Path.Combine(commonFolder, elfFileName);
                     if (!File.Exists(elfPath))
-                    {
                         ElfGenerator.GeneratePs1Elf(baseElf, disc.FilePath, elfPath, disc.DiscNumber, disc.Name, disc.GameId, msg => _log.Log(msg));
-                    }
                 }
             }
 
-            // title.cfg para el primer disco (si no existe)
             string titleCfgPath = Path.Combine(commonFolder, "title.cfg");
             if (!File.Exists(titleCfgPath))
             {
                 string elfFileName = $"{Path.GetFileNameWithoutExtension(discs.First().FilePath)}.ELF";
-                string cfgContent = $"title={baseFolderName}\nboot={elfFileName}\n";
-                await File.WriteAllTextAsync(titleCfgPath, cfgContent);
+                await File.WriteAllTextAsync(titleCfgPath, $"title={baseFolderName}\nboot={elfFileName}\n");
             }
         }
 
@@ -473,12 +473,18 @@ public class ProcessPopsViewModel : BindableObject
             string artFile = Path.Combine(_paths.ArtFolder, game.GameId + ".jpg");
             if (!File.Exists(artFile))
             {
-                string? url = GameDatabase.TryGetCoverUrl(game.GameId) ?? $"{mirrorBase}/ART/{game.GameId}.jpg";
+                string? url = GameDatabase.TryGetCoverUrl(game.GameId)
+                              ?? $"{mirrorBase}/ART/{game.GameId}.jpg";
+
                 if (await DownloadFileAsync(url, artFile))
                 {
                     try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
                     catch { }
                     downloaded++;
+                }
+                else
+                {
+                    _log.Log($"[Cover] No disponible para {game.Name}");
                 }
             }
             else
@@ -538,61 +544,4 @@ public class ProcessPopsViewModel : BindableObject
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
                 string newName = $"{game.GameId}.{game.Name}.iso";
-                string newPath = Path.Combine(folder, newName);
-
-                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    skipped++;
-                    continue;
-                }
-
-                File.Move(game.FilePath, newPath);
-                game.FilePath = newPath;
-                if (Directory.Exists(game.GameFolder))
-                {
-                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
-                    Directory.Move(game.GameFolder, newFolderPath);
-                    game.GameFolder = newFolderPath;
-                }
-                renamed++;
-            }
-            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
-        }
-
-        Ps1Games.Clear();
-        Ps2Games.Clear();
-        RefreshGameLists();
-
-        string result = $"Renombrados: {renamed}. Omitidos: {skipped} (ya tenían el formato).";
-        if (errors.Any())
-            result += $" Errores: {string.Join("; ", errors)}";
-
-        Status = result;
-        await Task.CompletedTask;
-    }
-
-    // ==================== MÉTODOS AUXILIARES ====================
-    private async Task<bool> DownloadFileAsync(string url, string destination)
-    {
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            var response = await client.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return false;
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            await using var fs = new FileStream(destination, FileMode.Create);
-            await response.Content.CopyToAsync(fs);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    protected bool SetProperty<T>(ref T backingStore, T value,
-        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
-    {
-        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
-        backingStore = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-}
+                string newPath = Path.Co
