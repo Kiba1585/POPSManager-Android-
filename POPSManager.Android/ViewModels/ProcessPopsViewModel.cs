@@ -93,7 +93,6 @@ public class ProcessPopsViewModel : BindableObject
             }
             RefreshGameLists();
             Status = $"Raíz OPL: {savedRoot}";
-            // Cargar la base de datos de covers desde la caché interna
             GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
         }
         else Status = "Selecciona la carpeta raíz OPL (desde Inicio o aquí).";
@@ -138,7 +137,6 @@ public class ProcessPopsViewModel : BindableObject
             msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
         );
 
-        // Recargar la base de datos local por si hubo cambios
         GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
     }
 
@@ -400,12 +398,31 @@ public class ProcessPopsViewModel : BindableObject
         await Task.CompletedTask;
     }
 
-    // ==================== DESCARGAR COVERS Y METADATOS ====================
+    // ==================== DESCARGAR COVERS Y METADATOS (CON DIAGNÓSTICO) ====================
     private async Task DownloadAllCoversAndMetadata()
     {
         var allGames = Ps1Games.Concat(Ps2Games).ToList();
         if (!allGames.Any()) { Status = "No hay juegos para actualizar."; return; }
 
+        string artFolder = _paths.ArtFolder;
+        string cfgFolder = _paths.CfgFolder;
+
+        // 1. Mostrar rutas y comprobar escritura
+        Status = $"ART: {artFolder}\nCFG: {cfgFolder}\nVerificando permisos...";
+
+        bool artWritable = TestWrite(artFolder);
+        bool cfgWritable = TestWrite(cfgFolder);
+
+        if (!artWritable || !cfgWritable)
+        {
+            Status = $"❌ Sin permisos de escritura en:\n" +
+                     (artWritable ? "" : $"  ART: {artFolder}\n") +
+                     (cfgWritable ? "" : $"  CFG: {cfgFolder}\n") +
+                     "Usa 'Abrir ajustes de almacenamiento' y activa el permiso.";
+            return;
+        }
+
+        // 2. Iniciar descarga/copia
         int coversDownloaded = 0, coversSkipped = 0, metaCopied = 0, metaSkipped = 0;
         string mirrorBase = "https://archive.org/download/oplm-art-2023-11";
         string sourceCfgFolder = Path.Combine(DatabaseUpdater.InternalDatabaseFolder, "CFG");
@@ -417,7 +434,7 @@ public class ProcessPopsViewModel : BindableObject
             MainThread.BeginInvokeOnMainThread(() => Status = $"{i + 1}/{allGames.Count}: {game.Name}");
 
             // ----- COVER -----
-            string artFile = Path.Combine(_paths.ArtFolder, game.GameId + ".jpg");
+            string artFile = Path.Combine(artFolder, game.GameId + ".jpg");
             if (!File.Exists(artFile))
             {
                 string? url = GameDatabase.TryGetCoverUrl(game.GameId) ?? $"{mirrorBase}/ART/{game.GameId}.jpg";
@@ -435,7 +452,7 @@ public class ProcessPopsViewModel : BindableObject
             else { coversSkipped++; }
 
             // ----- METADATOS -----
-            string destCfgFile = Path.Combine(_paths.CfgFolder, game.GameId + ".cfg");
+            string destCfgFile = Path.Combine(cfgFolder, game.GameId + ".cfg");
             if (!File.Exists(destCfgFile))
             {
                 if (internalDbExists)
@@ -443,7 +460,11 @@ public class ProcessPopsViewModel : BindableObject
                     string srcCfgFile = Path.Combine(sourceCfgFolder, game.GameId + ".cfg");
                     if (File.Exists(srcCfgFile))
                     {
-                        try { File.Copy(srcCfgFile, destCfgFile); metaCopied++; }
+                        try
+                        {
+                            File.Copy(srcCfgFile, destCfgFile);
+                            metaCopied++;
+                        }
                         catch { _log.Log($"[Meta] Error copiando {game.GameId}.cfg"); }
                     }
                     else
@@ -460,94 +481,9 @@ public class ProcessPopsViewModel : BindableObject
         }
 
         string msg = $"Covers: {coversDownloaded} descargados, {coversSkipped} ya existían.\n" +
-                     $"Metadatos: {metaCopied} copiados, {metaSkipped} ya existían.";
+                     $"Metadatos: {metaCopied} copiados, {metaSkipped} ya existían.\n" +
+                     $"Ruta ART: {artFolder}\nRuta CFG: {cfgFolder}";
         if (!internalDbExists) msg += "\n⚠️ Actualiza la base de datos primero.";
         Status = msg;
-    }
 
-    // ==================== RENOMBRAR JUEGOS ====================
-    private async Task RenameAllGames()
-    {
-        if (!Ps1Games.Any() && !Ps2Games.Any()) { Status = "No hay juegos para renombrar."; return; }
-
-        int renamed = 0, skipped = 0;
-        var errors = new List<string>();
-
-        foreach (var game in Ps1Games.ToList())
-        {
-            try
-            {
-                string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId}.{game.Name}.VCD";
-                string newPath = Path.Combine(folder, newName);
-                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
-
-                File.Move(game.FilePath, newPath);
-                game.FilePath = newPath;
-                if (Directory.Exists(game.GameFolder))
-                {
-                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
-                    Directory.Move(game.GameFolder, newFolderPath);
-                    game.GameFolder = newFolderPath;
-                }
-                renamed++;
-            }
-            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
-        }
-
-        foreach (var game in Ps2Games.ToList())
-        {
-            try
-            {
-                string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.GameId}.{game.Name}.iso";
-                string newPath = Path.Combine(folder, newName);
-                if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
-
-                File.Move(game.FilePath, newPath);
-                game.FilePath = newPath;
-                if (Directory.Exists(game.GameFolder))
-                {
-                    string newFolderPath = Path.Combine(folder, $"{game.GameId}.{game.Name}");
-                    Directory.Move(game.GameFolder, newFolderPath);
-                    game.GameFolder = newFolderPath;
-                }
-                renamed++;
-            }
-            catch (Exception ex) { errors.Add($"{game.Name}: {ex.Message}"); }
-        }
-
-        Ps1Games.Clear(); Ps2Games.Clear();
-        RefreshGameLists();
-
-        string result = $"Renombrados: {renamed}. Omitidos: {skipped} (ya tenían el formato).";
-        if (errors.Any()) result += $" Errores: {string.Join("; ", errors)}";
-        Status = result;
-        await Task.CompletedTask;
-    }
-
-    // ==================== MÉTODOS AUXILIARES ====================
-    private async Task<bool> DownloadFileAsync(string url, string destination)
-    {
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            var response = await client.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return false;
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            await using var fs = new FileStream(destination, FileMode.Create);
-            await response.Content.CopyToAsync(fs);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    protected bool SetProperty<T>(ref T backingStore, T value,
-        [System.Runtime.CompilerServices.CallerMemberName] string propertyName = "")
-    {
-        if (EqualityComparer<T>.Default.Equals(backingStore, value)) return false;
-        backingStore = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-}
+        GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
