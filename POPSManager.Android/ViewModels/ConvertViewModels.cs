@@ -62,14 +62,9 @@ public class ConvertViewModel : BindableObject
         ConvertCommand = new Command(async () => await SafeExecute(ConvertFiles));
         OpenOutputFolderCommand = new Command(OpenOutputFolder);
 
-        // Carga inicial desde settings (también se refresca al aparecer)
         RefreshFromSettings();
     }
 
-    /// <summary>
-    /// Refresca los campos con los valores guardados en settings.
-    /// Se llama desde OnAppearing de la página.
-    /// </summary>
     public void RefreshFromSettings()
     {
         var savedSource = _settings.SourceFolder;
@@ -83,13 +78,12 @@ public class ConvertViewModel : BindableObject
         var savedDest = _settings.DestinationFolder;
         if (!string.IsNullOrEmpty(savedDest) && savedDest != _destFolder)
         {
-            _destFolder = savedDest;
+            _destFolder = savedDest.Trim();   // sanitizar espacios
             OnPropertyChanged(nameof(DestFolder));
 
-            // Sincronizar la raíz OPL en PathsServiceAndroid
             if (_paths is PathsServiceAndroid androidPaths)
             {
-                androidPaths.RootFolder = savedDest;
+                androidPaths.RootFolder = _destFolder;
                 androidPaths.EnsureOplFoldersExist();
             }
         }
@@ -100,9 +94,9 @@ public class ConvertViewModel : BindableObject
         var path = await _paths.SelectFolderAsync();
         if (path != null)
         {
-            _settings.SourceFolder = path;
+            _settings.SourceFolder = path.Trim();
             await _settings.SaveAsync();
-            SourceFolder = path;
+            SourceFolder = path.Trim();
         }
     }
 
@@ -111,15 +105,15 @@ public class ConvertViewModel : BindableObject
         var path = await _paths.SelectFolderAsync();
         if (path != null)
         {
-            _settings.DestinationFolder = path;
-            _settings.RootFolder = path;
+            string cleanPath = path.Trim();
+            _settings.DestinationFolder = cleanPath;
+            _settings.RootFolder = cleanPath;
             await _settings.SaveAsync();
-            DestFolder = path;
+            DestFolder = cleanPath;
 
-            // Crear la estructura OPL dentro de la nueva raíz
             if (_paths is PathsServiceAndroid androidPaths)
             {
-                androidPaths.RootFolder = path;
+                androidPaths.RootFolder = cleanPath;
                 androidPaths.EnsureOplFoldersExist();
             }
         }
@@ -165,15 +159,13 @@ public class ConvertViewModel : BindableObject
             return;
         }
 
-        // La salida real es la carpeta POPS dentro de la raíz OPL
         string outputFolder = _paths.PopsFolder;
-        try
+
+        // Verificar permisos de escritura en la carpeta POPS
+        if (!TestWrite(outputFolder))
         {
-            Directory.CreateDirectory(outputFolder);
-        }
-        catch (Exception ex)
-        {
-            Status = $"Error al crear carpeta de salida: {ex.Message}";
+            Status = $"❌ Sin permisos de escritura en:\n{outputFolder}\n" +
+                     "Ve a Ajustes > Aplicaciones > POPSManager > Acceso a todos los archivos y actívalo.";
             return;
         }
 
@@ -182,7 +174,7 @@ public class ConvertViewModel : BindableObject
             setStatus: msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
         );
 
-        _actualOutputFolder = outputFolder;   // para abrir después
+        _actualOutputFolder = outputFolder;
 
         Status = "Convirtiendo...";
         try
@@ -206,13 +198,20 @@ public class ConvertViewModel : BindableObject
 
     private async Task SafeExecute(Func<Task> action)
     {
+        try { await action(); }
+        catch (Exception ex) { Status = $"Error: {ex.Message}"; }
+    }
+
+    private bool TestWrite(string folder)
+    {
         try
         {
-            await action();
+            Directory.CreateDirectory(folder);
+            string testFile = Path.Combine(folder, ".writetest");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+            return true;
         }
-        catch (Exception ex)
-        {
-            Status = $"Error: {ex.Message}";
-        }
+        catch { return false; }
     }
 }
