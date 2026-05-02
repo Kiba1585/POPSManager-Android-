@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using POPSManager.Core.Logic;
@@ -27,9 +28,9 @@ public class ProcessPopsViewModel : BindableObject
     {
         public string GameId { get; set; } = "";          // ID normalizado (sin puntos)
         public string OriginalGameId { get; set; } = "";  // ID original (con puntos)
-        public string Name { get; set; } = "";
-        public string FilePath { get; set; } = "";
-        public string GameFolder { get; set; } = "";
+        public string Name { get; set; } = "";            // nombre limpio sin región/idiomas/crack
+        public string FilePath { get; set; } = "";        // ruta al .VCD o .ISO
+        public string GameFolder { get; set; } = "";      // carpeta auxiliar
         public bool IsMultiDisc { get; set; }
         public int DiscNumber { get; set; } = 1;
         public override string ToString() => Name;
@@ -226,10 +227,12 @@ public class ProcessPopsViewModel : BindableObject
         };
     }
 
+    /// <summary> Limpia el nombre del juego para mostrar en OPL: elimina Game ID, región, idiomas, crack y caracteres especiales. </summary>
     private string OplCompatibleTitle(string rawName, int discNumber, bool multiDisc)
     {
         string title = rawName;
 
+        // 1. Eliminar Game ID del principio (formatos: "GAMEID - ", "GAMEID ", "GAMEID.")
         int dashIndex = title.IndexOf(" - ");
         if (dashIndex > 0) { title = title.Substring(dashIndex + 3).Trim(); }
         else if (title.Contains(' '))
@@ -242,18 +245,29 @@ public class ProcessPopsViewModel : BindableObject
         {
             int firstDot = title.IndexOf('.');
             if (firstDot > 0 && title.Substring(0, firstDot).Length >= 4 && title.Substring(0, firstDot).Contains('_'))
-            {
                 title = title.Substring(firstDot + 1).Trim();
-            }
         }
 
-        if (multiDisc && discNumber > 1) title += $" (CD{discNumber})";
+        // 2. Eliminar etiquetas entre paréntesis que empiecen con: Europe, USA, Japan, En, Fr, De, Es, It, etc.
+        title = Regex.Replace(title, @"\s*\(?(Europe|USA|Japan|Asia|World|En|Fr|De|Es|It|Pt|Ja|Ko|Zh|Ru|Nl|Sv|No|Da|Fi|Pl|Cz|Hu|Tr|Gr|Ar|He|Crack|Fix|Trainer|Hack)\)?\s*",
+                              "", RegexOptions.IgnoreCase);
 
-        return title
+        // 3. Reemplazar caracteres no deseados
+        title = title
             .Replace(' ', '_')
             .Replace("'", "")
             .Replace(":", "")
+            .Replace("[", "").Replace("]", "")
             .Trim();
+
+        // 4. Eliminar guiones bajos múltiples
+        title = Regex.Replace(title, @"_+", "_").Trim('_');
+
+        // 5. Añadir número de disco si es multidisco
+        if (multiDisc && discNumber > 1)
+            title += $" (CD{discNumber})";
+
+        return title;
     }
 
     private string NormalizeGameId(string rawId)
@@ -315,9 +329,7 @@ public class ProcessPopsViewModel : BindableObject
             string elfPath;
 
             if (game.IsMultiDisc)
-            {
                 elfPath = Path.Combine(game.GameFolder, elfFileName);
-            }
             else
             {
                 string gameAppFolder = Path.Combine(_paths.AppsFolder, game.Name);
@@ -330,11 +342,7 @@ public class ProcessPopsViewModel : BindableObject
                 ElfGenerator.GeneratePs1Elf(baseElf, game.FilePath, elfPath, game.DiscNumber, game.Name, game.OriginalGameId, msg => _log.Log(msg));
                 generated++;
             }
-            else
-            {
-                _log.Log($"[ELF] Ya existe: {elfFileName}");
-                skipped++;
-            }
+            else { _log.Log($"[ELF] Ya existe: {elfFileName}"); skipped++; }
 
             if (!game.IsMultiDisc)
             {
@@ -351,9 +359,7 @@ public class ProcessPopsViewModel : BindableObject
             }
         }
 
-        Status = generated > 0
-            ? $"{generated} ELFs generados. {skipped} ya existían."
-            : $"No se generaron ELFs. {skipped} ya existían.";
+        Status = generated > 0 ? $"{generated} ELFs generados. {skipped} ya existían." : $"No se generaron ELFs. {skipped} ya existían.";
         await Task.CompletedTask;
     }
 
@@ -370,7 +376,9 @@ public class ProcessPopsViewModel : BindableObject
             var discs = group.OrderBy(g => g.DiscNumber).ToList();
             if (discs.Count <= 1) continue;
 
-            string baseFolderName = discs.First().Name.Replace(" (CD1)", "").Replace(" (CD2)", "").Replace(" (CD3)", "").Replace(" (CD4)", "").Trim();
+            string baseFolderName = discs.First().Name;
+            // Eliminar "(CD1)" etc.
+            baseFolderName = Regex.Replace(baseFolderName, @"\s*\(CD\d\)", "").Trim();
             string commonFolder = Path.Combine(Path.GetDirectoryName(discs.First().FilePath)!, baseFolderName);
             Directory.CreateDirectory(commonFolder);
 
@@ -417,27 +425,19 @@ public class ProcessPopsViewModel : BindableObject
         if (_cheatFixGraphics) extraLines.Add("FIXGRAPHICS=ON");
 
         int generated = 0, skipped = 0;
-
         foreach (var game in Ps1Games)
         {
             Directory.CreateDirectory(game.GameFolder);
             string cheatFile = Path.Combine(game.GameFolder, "CHEAT.TXT");
-
             if (!File.Exists(cheatFile))
             {
                 CheatGenerator.GenerateCheatTxt(game.OriginalGameId, game.GameFolder, extraLines, msg => _log.Log(msg));
                 generated++;
             }
-            else
-            {
-                _log.Log($"[Cheats] Ya existe: {cheatFile}");
-                skipped++;
-            }
+            else { _log.Log($"[Cheats] Ya existe: {cheatFile}"); skipped++; }
         }
 
-        Status = generated > 0
-            ? $"{generated} CHEAT.TXT generados. {skipped} ya existían."
-            : $"No se generaron cheats. {skipped} ya existían.";
+        Status = generated > 0 ? $"{generated} CHEAT.TXT generados. {skipped} ya existían." : $"No se generaron cheats. {skipped} ya existían.";
         await Task.CompletedTask;
     }
 
@@ -449,14 +449,10 @@ public class ProcessPopsViewModel : BindableObject
 
         string artFolder = _paths.ArtFolder;
         string cfgFolder = _paths.CfgFolder;
-
         Status = $"ART: {artFolder}\nCFG: {cfgFolder}\nVerificando permisos...";
-
         if (!TestWrite(artFolder) || !TestWrite(cfgFolder))
         {
-            Status = $"❌ Sin permisos de escritura en:\n" +
-                     $"  ART: {artFolder}\n  CFG: {cfgFolder}\n" +
-                     "Usa 'Abrir ajustes de almacenamiento' y activa el permiso.";
+            Status = $"❌ Sin permisos de escritura en:\n  ART: {artFolder}\n  CFG: {cfgFolder}\nUsa 'Abrir ajustes de almacenamiento' y activa el permiso.";
             return;
         }
 
@@ -465,15 +461,12 @@ public class ProcessPopsViewModel : BindableObject
         string sourceCfgFolder = Path.Combine(DatabaseUpdater.InternalDatabaseFolder, "CFG");
         bool internalDbExists = Directory.Exists(sourceCfgFolder);
 
-        var sampleIds = allGames.Take(3).Select(g => $"{g.OriginalGameId} (→{g.GameId})").ToList();
-        Status = $"IDs de ejemplo: {string.Join(", ", sampleIds)}";
-
         for (int i = 0; i < allGames.Count; i++)
         {
             var game = allGames[i];
             MainThread.BeginInvokeOnMainThread(() => Status = $"{i + 1}/{allGames.Count}: {game.Name}");
 
-            // ----- COVER -----
+            // Cover
             string artFile = Path.Combine(artFolder, game.OriginalGameId + ".jpg");
             if (!File.Exists(artFile))
             {
@@ -484,14 +477,11 @@ public class ProcessPopsViewModel : BindableObject
                     catch { }
                     coversDownloaded++;
                 }
-                else
-                {
-                    _log.Log($"[Cover] No disponible para {game.Name} (ID:{game.OriginalGameId})");
-                }
+                else _log.Log($"[Cover] No disponible para {game.Name} (ID:{game.OriginalGameId})");
             }
-            else { coversSkipped++; }
+            else coversSkipped++;
 
-            // ----- METADATOS -----
+            // Metadatos
             string destCfgFile = Path.Combine(cfgFolder, game.OriginalGameId + ".cfg");
             if (!File.Exists(destCfgFile))
             {
@@ -499,14 +489,8 @@ public class ProcessPopsViewModel : BindableObject
                 {
                     string? copied = TryCopyCfg(sourceCfgFolder, cfgFolder, game.OriginalGameId)
                                  ?? TryCopyCfg(sourceCfgFolder, cfgFolder, game.GameId);
-                    if (copied != null)
-                    {
-                        metaCopied++;
-                    }
-                    else
-                    {
-                        _log.Log($"[Meta] No encontrado: {game.OriginalGameId} ni {game.GameId}");
-                    }
+                    if (copied != null) metaCopied++;
+                    else _log.Log($"[Meta] No encontrado: {game.OriginalGameId} ni {game.GameId}");
                 }
                 else
                 {
@@ -514,7 +498,7 @@ public class ProcessPopsViewModel : BindableObject
                     break;
                 }
             }
-            else { metaSkipped++; }
+            else metaSkipped++;
         }
 
         string msg = $"Covers: {coversDownloaded} descargados, {coversSkipped} ya existían.\n" +
@@ -522,7 +506,6 @@ public class ProcessPopsViewModel : BindableObject
                      $"Ruta ART: {artFolder}\nRuta CFG: {cfgFolder}";
         if (!internalDbExists) msg += "\n⚠️ Actualiza la base de datos primero.";
         Status = msg;
-
         GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
     }
 
@@ -567,7 +550,8 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.OriginalGameId}.{game.Name}.VCD";
+                string discSuffix = game.IsMultiDisc && game.DiscNumber > 1 ? $" (CD{game.DiscNumber})" : "";
+                string newName = $"{game.OriginalGameId}.{game.Name}{discSuffix}.VCD";
                 string newPath = Path.Combine(folder, newName);
                 if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
 
@@ -575,7 +559,7 @@ public class ProcessPopsViewModel : BindableObject
                 game.FilePath = newPath;
                 if (Directory.Exists(game.GameFolder))
                 {
-                    string newFolderPath = Path.Combine(folder, $"{game.OriginalGameId}.{game.Name}");
+                    string newFolderPath = Path.Combine(folder, $"{game.OriginalGameId}.{game.Name}{discSuffix}");
                     Directory.Move(game.GameFolder, newFolderPath);
                     game.GameFolder = newFolderPath;
                 }
@@ -589,7 +573,8 @@ public class ProcessPopsViewModel : BindableObject
             try
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
-                string newName = $"{game.OriginalGameId}.{game.Name}.iso";
+                string discSuffix = game.IsMultiDisc && game.DiscNumber > 1 ? $" (CD{game.DiscNumber})" : "";
+                string newName = $"{game.OriginalGameId}.{game.Name}{discSuffix}.iso";
                 string newPath = Path.Combine(folder, newName);
                 if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
 
@@ -597,7 +582,7 @@ public class ProcessPopsViewModel : BindableObject
                 game.FilePath = newPath;
                 if (Directory.Exists(game.GameFolder))
                 {
-                    string newFolderPath = Path.Combine(folder, $"{game.OriginalGameId}.{game.Name}");
+                    string newFolderPath = Path.Combine(folder, $"{game.OriginalGameId}.{game.Name}{discSuffix}");
                     Directory.Move(game.GameFolder, newFolderPath);
                     game.GameFolder = newFolderPath;
                 }
@@ -615,7 +600,7 @@ public class ProcessPopsViewModel : BindableObject
         await Task.CompletedTask;
     }
 
-    // ==================== MÉTODOS AUXILIARES ====================
+    // ==================== MÉTODO AUXILIAR DE DESCARGA ====================
     private async Task<bool> DownloadFileAsync(string url, string destination)
     {
         try
