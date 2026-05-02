@@ -21,7 +21,14 @@ namespace POPSManager.Android.Services
             $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
         /// <summary>
-        /// Descarga la base de datos y extrae solo los CFG de los juegos indicados.
+        /// Carpeta interna donde se guarda la base de datos completa.
+        /// </summary>
+        public static string InternalDatabaseFolder =>
+            Path.Combine(FileSystem.AppDataDirectory, "Database");
+
+        /// <summary>
+        /// Descarga la base de datos completa (si es necesario) y copia al destino
+        /// solo los CFG de los juegos indicados.
         /// </summary>
         public static async Task<bool> DownloadAndExtractDatabaseAsync(
             string oplRootFolder,
@@ -32,6 +39,7 @@ namespace POPSManager.Android.Services
             {
                 onProgress?.Invoke("Verificando versión de la base de datos...");
 
+                // 1. Verificar si hay nueva versión
                 (string? tag, string? downloadUrl) = await GetLatestReleaseInfoAsync();
                 if (string.IsNullOrEmpty(tag) || string.IsNullOrEmpty(downloadUrl))
                 {
@@ -40,68 +48,66 @@ namespace POPSManager.Android.Services
                 }
 
                 string? savedVersion = Preferences.Get(DbVersionKey, null);
-                if (savedVersion == tag)
+                string internalDbPath = InternalDatabaseFolder;
+
+                if (savedVersion != tag || !Directory.Exists(internalDbPath))
                 {
-                    onProgress?.Invoke("La base de datos ya está actualizada.");
-                    return true;
-                }
+                    // 2. Descargar y extraer en la caché interna
+                    onProgress?.Invoke($"Descargando base de datos ({tag})...");
 
-                onProgress?.Invoke($"Descargando base de datos ({tag})...");
+                    string zipTemp = Path.Combine(Path.GetTempPath(), $"popsmanager_db_{Guid.NewGuid():N}.zip");
+                    if (File.Exists(zipTemp)) try { File.Delete(zipTemp); } catch { }
 
-                string zipTemp = Path.Combine(Path.GetTempPath(), $"popsmanager_db_{Guid.NewGuid():N}.zip");
-                if (File.Exists(zipTemp))
-                {
-                    try { File.Delete(zipTemp); } catch { }
-                }
+                    using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+                    client.DefaultRequestHeaders.Add("User-Agent", "POPSManager-Android");
+                    var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                    response.EnsureSuccessStatusCode();
 
-                using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-                client.DefaultRequestHeaders.Add("User-Agent", "POPSManager-Android");
-
-                var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
-                response.EnsureSuccessStatusCode();
-
-                long totalBytes = response.Content.Headers.ContentLength ?? -1;
-                using var stream = await response.Content.ReadAsStreamAsync();
-
-                using (var fileStream = new FileStream(zipTemp, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    byte[] buffer = new byte[8192];
-                    long totalRead = 0;
-                    int bytesRead;
-                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    long totalBytes = response.Content.Headers.ContentLength ?? -1;
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    using (var fileStream = new FileStream(zipTemp, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
-                        await fileStream.WriteAsync(buffer, 0, bytesRead);
-                        totalRead += bytesRead;
-                        if (totalBytes > 0)
+                        byte[] buffer = new byte[8192];
+                        long totalRead = 0;
+                        int bytesRead;
+                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                         {
-                            int percent = (int)((totalRead * 100) / totalBytes);
-                            onProgress?.Invoke($"Descargando... {percent}%");
+                            await fileStream.WriteAsync(buffer, 0, bytesRead);
+                            totalRead += bytesRead;
+                            if (totalBytes > 0)
+                            {
+                                int percent = (int)((totalRead * 100) / totalBytes);
+                                onProgress?.Invoke($"Descargando... {percent}%");
+                            }
                         }
                     }
+
+                    // Extraer en carpeta interna (borra la anterior si existe)
+                    if (Directory.Exists(internalDbPath))
+                        Directory.Delete(internalDbPath, true);
+                    Directory.CreateDirectory(internalDbPath);
+
+                    await Task.Run(() => ZipFile.ExtractToDirectory(zipTemp, internalDbPath, true));
+
+                    try { File.Delete(zipTemp); } catch { }
+                    Preferences.Set(DbVersionKey, tag);
+                    onProgress?.Invoke("Base de datos actualizada en caché interna.");
+                }
+                else
+                {
+                    onProgress?.Invoke("La base de datos ya está actualizada.");
                 }
 
-                onProgress?.Invoke("Filtrando metadatos...");
+                // 3. Copiar solo los CFG de los juegos al destino
+                onProgress?.Invoke("Copiando metadatos de tus juegos...");
+                string sourceCfgFolder = Path.Combine(internalDbPath, "CFG");
+                string destCfgFolder = Path.Combine(oplRootFolder, "CFG");
+                Directory.CreateDirectory(destCfgFolder);
 
-                // Extraer solo los CFG necesarios en una carpeta temporal
-                string tempExtract = Path.Combine(Path.GetTempPath(), $"popsmanager_extract_{Guid.NewGuid():N}");
-                Directory.CreateDirectory(tempExtract);
-
-                await Task.Run(() =>
-                {
-                    if (File.Exists(zipTemp))
-                    {
-                        ZipFile.ExtractToDirectory(zipTemp, tempExtract, true);
-                    }
-                });
-
-                // Copiar únicamente los CFG correspondientes a los juegos
-                string cfgFolder = Path.Combine(oplRootFolder, "CFG");
-                Directory.CreateDirectory(cfgFolder);
-
-                var gameIdSet = new HashSet<string>(gameIds.Where(id => !string.IsNullOrWhiteSpace(id)), StringComparer.OrdinalIgnoreCase);
+                var gameIdSet = new HashSet<string>(gameIds.Where(id => !string.IsNullOrWhiteSpace(id)),
+                    StringComparer.OrdinalIgnoreCase);
                 int copied = 0;
 
-                string sourceCfgFolder = Path.Combine(tempExtract, "CFG");
                 if (Directory.Exists(sourceCfgFolder))
                 {
                     foreach (string cfgFile in Directory.GetFiles(sourceCfgFolder, "*.cfg"))
@@ -109,19 +115,18 @@ namespace POPSManager.Android.Services
                         string cfgId = Path.GetFileNameWithoutExtension(cfgFile);
                         if (gameIdSet.Contains(cfgId))
                         {
-                            string dest = Path.Combine(cfgFolder, Path.GetFileName(cfgFile));
-                            File.Copy(cfgFile, dest, true);
-                            copied++;
+                            string dest = Path.Combine(destCfgFolder, Path.GetFileName(cfgFile));
+                            // Solo copiar si no existe o si es más nuevo (opcional)
+                            if (!File.Exists(dest))
+                            {
+                                File.Copy(cfgFile, dest);
+                                copied++;
+                            }
                         }
                     }
                 }
 
-                // Limpiar temporales
-                try { File.Delete(zipTemp); } catch { }
-                try { Directory.Delete(tempExtract, true); } catch { }
-
-                Preferences.Set(DbVersionKey, tag);
-                onProgress?.Invoke($"Base de datos actualizada. {copied} metadatos copiados.");
+                onProgress?.Invoke($"Metadatos copiados: {copied} de {gameIdSet.Count} juegos.");
                 return true;
             }
             catch (IOException ioEx) when (ioEx.Message.Contains("SharingViolation"))
