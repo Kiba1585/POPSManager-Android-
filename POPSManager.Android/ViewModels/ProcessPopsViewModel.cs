@@ -192,7 +192,8 @@ public class ProcessPopsViewModel : BindableObject
                 }
             }
 
-            Status = $"Encontrados: {popsCount} VCD, {dvdCount} ISO, {appsCount} ELF.\nRaíz: {_paths.RootFolder}";
+            var sample = Ps1Games.Take(3).Select(g => g.Name);
+            Status = $"Encontrados: {popsCount} VCD, {dvdCount} ISO, {appsCount} ELF.\nEjemplos: {string.Join(", ", sample)}";
         }
         catch (Exception ex) { Status = $"Error al listar: {ex.Message}"; }
     }
@@ -328,20 +329,27 @@ public class ProcessPopsViewModel : BindableObject
         Status = "Procesamiento completo.";
     }
 
-    // ==================== GENERAR ELFS ====================
+    // ==================== GENERAR ELFS (CON DIAGNÓSTICO DE POPSTARTER) ====================
     private async Task GenerateAllElfs()
     {
         Status = "Generando ELFs...";
         string baseElf = _paths.PopstarterElfPath;
-        if (!File.Exists(baseElf))
+        string rootElf = Path.Combine(_paths.RootFolder, "POPSTARTER.ELF");
+        string popsElf = Path.Combine(_paths.PopsFolder, "POPSTARTER.ELF");
+
+        bool existsRoot = File.Exists(rootElf);
+        bool existsPops = File.Exists(popsElf);
+        Status = $"¿Existe POPSTARTER.ELF? Raíz: {existsRoot}, POPS: {existsPops}";
+
+        if (!existsRoot && !existsPops)
         {
-            Status = $"POPSTARTER.ELF no encontrado.\nSe buscó en:\n" +
-                     $"{Path.Combine(_paths.RootFolder, "POPSTARTER.ELF")}\n" +
-                     $"{Path.Combine(_paths.PopsFolder, "POPSTARTER.ELF")}\n" +
-                     "Cópialo a una de esas ubicaciones.";
+            Status = $"POPSTARTER.ELF no encontrado. Verifica los permisos de lectura.\n" +
+                     $"Ruta raíz: {rootElf}\nRuta POPS: {popsElf}";
             await Task.CompletedTask;
             return;
         }
+
+        string elfToUse = existsPops ? popsElf : rootElf;
 
         await ProcessMultidisc();
 
@@ -369,7 +377,7 @@ public class ProcessPopsViewModel : BindableObject
 
             if (!File.Exists(elfPath))
             {
-                ElfGenerator.GeneratePs1Elf(baseElf, game.FilePath, elfPath, game.DiscNumber, game.Name, game.OriginalGameId, msg => _log.Log(msg));
+                ElfGenerator.GeneratePs1Elf(elfToUse, game.FilePath, elfPath, game.DiscNumber, game.Name, game.OriginalGameId, msg => _log.Log(msg));
                 generated++;
             }
             else { _log.Log($"[ELF] Ya existe: {elfFileName}"); skipped++; }
@@ -470,7 +478,7 @@ public class ProcessPopsViewModel : BindableObject
         await Task.CompletedTask;
     }
 
-    // ==================== DESCARGAR COVERS Y METADATOS ====================
+    // ==================== DESCARGAR COVERS Y METADATOS (CON DIAGNÓSTICO VISIBLE) ====================
     private async Task DownloadAllCoversAndMetadata()
     {
         var allGames = Ps1Games.Concat(Ps2Games).ToList();
@@ -478,8 +486,6 @@ public class ProcessPopsViewModel : BindableObject
 
         string artFolder = _paths.ArtFolder;
         string cfgFolder = _paths.CfgFolder;
-
-        Status = $"ART: {artFolder}\nCFG: {cfgFolder}\nVerificando permisos...";
 
         if (!TestWrite(artFolder) || !TestWrite(cfgFolder))
         {
@@ -491,11 +497,14 @@ public class ProcessPopsViewModel : BindableObject
         // Mostrar info de caché interna
         string sourceCfgFolder = Path.Combine(DatabaseUpdater.InternalDatabaseFolder, "CFG");
         bool internalDbExists = Directory.Exists(sourceCfgFolder);
+        int cacheFileCount = 0;
+        string cacheExample = "";
+
         if (internalDbExists)
         {
             var cfgFiles = Directory.GetFiles(sourceCfgFolder, "*.cfg");
-            Status = $"Caché interna: {cfgFiles.Length} archivos CFG.\n" +
-                     $"Ejemplo: {Path.GetFileName(cfgFiles.FirstOrDefault() ?? "")}";
+            cacheFileCount = cfgFiles.Length;
+            cacheExample = cfgFiles.FirstOrDefault() ?? "";
         }
         else
         {
@@ -542,9 +551,9 @@ public class ProcessPopsViewModel : BindableObject
             else metaSkipped++;
         }
 
-        string msg = $"Covers: {coversDownloaded} descargados, {coversSkipped} ya existían.\n" +
+        string msg = $"Covers: {coversDownloaded} desc, {coversSkipped} ya existían.\n" +
                      $"Metadatos: {metaCopied} copiados, {metaSkipped} ya existían.\n" +
-                     $"Ruta ART: {artFolder}\nRuta CFG: {cfgFolder}";
+                     $"Caché: {cacheFileCount} CFGs. Ej: {Path.GetFileName(cacheExample)}";
         Status = msg;
         GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
     }
@@ -577,11 +586,15 @@ public class ProcessPopsViewModel : BindableObject
         catch { return false; }
     }
 
-    // ==================== RENOMBRAR JUEGOS (ahora con abreviación automática) ====================
+    // ==================== RENOMBRAR JUEGOS (AHORA CREA MULTIDISCO AUTOMÁTICO) ====================
     private async Task RenameAllGames()
     {
         if (!Ps1Games.Any() && !Ps2Games.Any()) { Status = "No hay juegos para renombrar."; return; }
 
+        // 1. Detectar y crear estructura multidisco para juegos que lo necesiten
+        CreateMultidiscStructure();
+
+        // 2. Renombrar
         int renamed = 0, skipped = 0;
         var errors = new List<string>();
 
@@ -591,7 +604,6 @@ public class ProcessPopsViewModel : BindableObject
             {
                 string folder = Path.GetDirectoryName(game.FilePath)!;
                 string discSuffix = game.IsMultiDisc && game.DiscNumber > 1 ? $" (CD{game.DiscNumber})" : "";
-                // El nombre ya viene limpio y posiblemente abreviado desde OplCompatibleTitle
                 string newName = $"{game.OriginalGameId}.{game.Name}{discSuffix}.VCD";
                 string newPath = Path.Combine(folder, newName);
                 if (string.Equals(game.FilePath, newPath, StringComparison.OrdinalIgnoreCase)) { skipped++; continue; }
@@ -639,6 +651,53 @@ public class ProcessPopsViewModel : BindableObject
         if (errors.Any()) result += $" Errores: {string.Join("; ", errors)}";
         Status = result;
         await Task.CompletedTask;
+    }
+
+    /// <summary> Crea DISCS.TXT y asigna números de disco basándose en nombres con CD1/CD2. </summary>
+    private void CreateMultidiscStructure()
+    {
+        var allVcds = Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly)
+                     .Concat(Directory.GetFiles(_paths.PopsFolder, "*.vcd", SearchOption.TopDirectoryOnly))
+                     .ToList();
+
+        // Agrupar por nombre base (eliminando CDx, Disc x, etc.)
+        var groups = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in allVcds)
+        {
+            string name = Path.GetFileNameWithoutExtension(file);
+            // Eliminar sufijos de disco: (CD1), (CD2), CD1, CD2, Disc1, etc.
+            string baseName = Regex.Replace(name, @"\s*\((CD|Disc)\s*\d\)", "", RegexOptions.IgnoreCase);
+            baseName = Regex.Replace(baseName, @"\s*(CD|Disc)\s*\d", "", RegexOptions.IgnoreCase).Trim();
+            if (!groups.ContainsKey(baseName))
+                groups[baseName] = new List<string>();
+            groups[baseName].Add(file);
+        }
+
+        foreach (var group in groups.Where(g => g.Value.Count > 1))
+        {
+            var discFiles = group.Value.OrderBy(f => f).ToList();
+            string commonFolder = Path.Combine(_paths.PopsFolder, group.Key);
+            Directory.CreateDirectory(commonFolder);
+
+            string discsTxtPath = Path.Combine(commonFolder, "DISCS.TXT");
+            if (!File.Exists(discsTxtPath))
+            {
+                File.WriteAllLines(discsTxtPath, discFiles.Select(Path.GetFileName));
+                _log.Log($"[Multidisco] Creado {discsTxtPath}");
+            }
+
+            // Actualizar entradas de juegos existentes
+            for (int i = 0; i < discFiles.Count; i++)
+            {
+                var game = Ps1Games.FirstOrDefault(g => g.FilePath.Equals(discFiles[i], StringComparison.OrdinalIgnoreCase));
+                if (game != null)
+                {
+                    game.IsMultiDisc = true;
+                    game.DiscNumber = i + 1;
+                    game.GameFolder = commonFolder;
+                }
+            }
+        }
     }
 
     // ==================== MÉTODO AUXILIAR DE DESCARGA ====================
