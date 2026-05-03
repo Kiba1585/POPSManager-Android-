@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -23,20 +24,28 @@ namespace POPSManager.Android.Services
             _listService = listService;
         }
 
-        public async Task<string> UpdateDatabaseAsync()
+        /// <summary>
+        /// Actualiza la base de datos interna, mostrando progreso mediante <paramref name="onProgress"/>.
+        /// </summary>
+        public async Task<string> UpdateDatabaseAsync(Action<string> onProgress)
         {
             var ids = _listService.Ps1Games.Select(g => g.OriginalGameId)
                       .Concat(_listService.Ps2Games.Select(g => g.OriginalGameId))
                       .Where(id => !string.IsNullOrWhiteSpace(id));
 
-            await DatabaseUpdater.DownloadAndExtractDatabaseAsync(_paths.RootFolder, ids,
-                msg => { });
-
-            GameDatabase.Initialize(InternalDatabaseFolder);
-            return "Base de datos actualizada.";
+            bool ok = await DatabaseUpdater.DownloadAndExtractDatabaseAsync(_paths.RootFolder, ids, onProgress);
+            if (ok)
+            {
+                GameDatabase.Initialize(InternalDatabaseFolder);
+                return "Base de datos actualizada.";
+            }
+            return "Error al actualizar la base de datos.";
         }
 
-        public async Task<string> DownloadCoversAndMetadataAsync()
+        /// <summary>
+        /// Descarga covers y copia metadatos, mostrando progreso mediante <paramref name="onProgress"/>.
+        /// </summary>
+        public async Task<string> DownloadCoversAndMetadataAsync(Action<string> onProgress)
         {
             var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
             if (!all.Any()) return "No hay juegos.";
@@ -45,7 +54,7 @@ namespace POPSManager.Android.Services
             string cfgFolder = _paths.CfgFolder;
             bool canWriteArt = TestWrite(artFolder);
             bool canWriteCfg = TestWrite(cfgFolder);
-            if (!canWriteArt && !canWriteCfg) return $"❌ Sin permisos en ART ni CFG.";
+            if (!canWriteArt && !canWriteCfg) return "❌ Sin permisos en ART ni CFG.";
 
             string sourceCfg = Path.Combine(InternalDatabaseFolder, "CFG");
             bool canMetadata = Directory.Exists(sourceCfg);
@@ -61,14 +70,18 @@ namespace POPSManager.Android.Services
             int coversDl = 0, coversSkip = 0, metaCopy = 0, metaSkip = 0;
             string mirror = "https://archive.org/download/oplm-art-2023-11";
 
-            foreach (var g in all)
+            for (int i = 0; i < all.Count; i++)
             {
+                var g = all[i];
+                onProgress($"{i + 1}/{all.Count}: {g.Name}");
+
                 if (string.IsNullOrWhiteSpace(g.OriginalGameId))
                 {
                     _log.Log($"[SKIP] Sin ID: {g.Name}");
                     continue;
                 }
 
+                // Cover
                 if (canWriteArt)
                 {
                     string art = Path.Combine(artFolder, g.OriginalGameId + ".jpg");
@@ -86,6 +99,7 @@ namespace POPSManager.Android.Services
                     else coversSkip++;
                 }
 
+                // Metadata
                 if (canWriteCfg && canMetadata)
                 {
                     string dest = Path.Combine(cfgFolder, g.OriginalGameId + ".cfg");
