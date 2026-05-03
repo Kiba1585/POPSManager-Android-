@@ -4,8 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using POPSManager.Core.Logic;
+using POPSManager.Core.Models;      // Core.Models.GameEntry
 using POPSManager.Core.Services;
-using POPSManager.Android.Models;
+using POPSManager.Android.Models;   // nuestro GameItem
 
 namespace POPSManager.Android.Services
 {
@@ -76,21 +77,66 @@ namespace POPSManager.Android.Services
 
         private GameItem BuildItem(string filePath, string parentFolder)
         {
-            string fname = Path.GetFileNameWithoutExtension(filePath);
-            string comp = Path.Combine(parentFolder, fname);
-            bool multi = File.Exists(Path.Combine(parentFolder, "DISCS.TXT"));
-            int disc = 1;
-            if (multi)
-            {
-                var u = fname.ToUpperInvariant();
-                if (u.Contains("CD2") || u.Contains("DISC2")) disc = 2;
-                else if (u.Contains("CD3") || u.Contains("DISC3")) disc = 3;
-                else if (u.Contains("CD4") || u.Contains("DISC4")) disc = 4;
-            }
-
+            // 1. Extraer GameID del archivo
             string orig = ExtractGameId(filePath);
             string norm = NormalizeGameId(orig);
-            string title = OplCompatibleTitle(fname, disc, multi);
+
+            // 2. Intentar obtener datos de la base de datos
+            string titleFromDb = null;
+            int discCountFromDb = 0;
+            string[] discNamesFromDb = null;
+
+            if (!string.IsNullOrWhiteSpace(orig) && GameDatabase.TryGetEntry(orig, out var dbEntry) && dbEntry != null)
+            {
+                titleFromDb = dbEntry.Name;
+                discCountFromDb = dbEntry.DiscCount;
+                discNamesFromDb = dbEntry.DiscNames;
+            }
+
+            // 3. Determinar número de disco
+            int discNumber = 1;
+            bool multiDisc = false;
+
+            string fname = Path.GetFileNameWithoutExtension(filePath);
+
+            if (discCountFromDb > 1 && discNamesFromDb != null && discNamesFromDb.Length == discCountFromDb)
+            {
+                for (int i = 0; i < discNamesFromDb.Length; i++)
+                {
+                    if (fname.Contains(discNamesFromDb[i], StringComparison.OrdinalIgnoreCase))
+                    {
+                        discNumber = i + 1;
+                        break;
+                    }
+                }
+                multiDisc = true;
+            }
+            else
+            {
+                bool discFound = false;
+                var u = fname.ToUpperInvariant();
+                if (u.Contains("CD2") || u.Contains("DISC2") || u.Contains("DISCO2") || u.Contains("(CD2)")) { discNumber = 2; discFound = true; }
+                else if (u.Contains("CD3") || u.Contains("DISC3") || u.Contains("DISCO3") || u.Contains("(CD3)")) { discNumber = 3; discFound = true; }
+                else if (u.Contains("CD4") || u.Contains("DISC4") || u.Contains("DISCO4") || u.Contains("(CD4)")) { discNumber = 4; discFound = true; }
+
+                if (discFound) multiDisc = true;
+            }
+
+            // 4. Determinar título final
+            string title;
+            if (!string.IsNullOrWhiteSpace(titleFromDb))
+            {
+                title = GameListService.OplCompatibleTitle(titleFromDb, discNumber, multiDisc);
+            }
+            else
+            {
+                title = GameListService.OplCompatibleTitle(fname, discNumber, multiDisc);
+            }
+
+            string comp = Path.Combine(parentFolder, fname);
+
+            if (!multiDisc && File.Exists(Path.Combine(parentFolder, "DISCS.TXT")))
+                multiDisc = true;
 
             return new GameItem
             {
@@ -99,8 +145,8 @@ namespace POPSManager.Android.Services
                 GameFolder = comp,
                 OriginalGameId = orig,
                 GameId = norm,
-                IsMultiDisc = multi,
-                DiscNumber = disc
+                IsMultiDisc = multiDisc,
+                DiscNumber = discNumber
             };
         }
 
