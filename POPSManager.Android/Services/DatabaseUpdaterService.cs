@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Maui.Storage;
 using POPSManager.Core.Services;
+using static POPSManager.Android.Services.DatabaseUpdater;
 
 namespace POPSManager.Android.Services
 {
@@ -24,16 +25,13 @@ namespace POPSManager.Android.Services
         private readonly IPathsService _paths;
         private readonly ILoggingService _log;
 
-        public static string InternalDatabaseFolder =>
-            Path.Combine(FileSystem.AppDataDirectory, "Database");
-
         public DatabaseUpdaterService(IPathsService paths, ILoggingService log)
         {
             _paths = paths;
             _log = log;
         }
 
-        /// <summary> Comprueba si hay una nueva versión comparando el tag_name guardado con el del último Release. </summary>
+        /// <summary> Comprueba si hay una nueva versión. </summary>
         public async Task<(bool newAvailable, string? tag)> CheckForUpdateAsync()
         {
             try
@@ -47,21 +45,18 @@ namespace POPSManager.Android.Services
                     return (false, null);
 
                 string? saved = Preferences.Get(VersionKey, null);
-                bool isNew = saved != tag;
-                return (isNew, tag);
+                return (saved != tag, tag);
             }
             catch (Exception ex)
             {
-                _log.Log($"[DB Update] Error al comprobar versión: {ex.Message}");
+                _log.Log($"[DB] Error al verificar versión: {ex.Message}");
                 return (false, null);
             }
         }
 
-        /// <summary> Guarda el tag de la última versión descargada. </summary>
         public void SaveVersion(string tag) => Preferences.Set(VersionKey, tag);
 
         // ==================== MODO COMPLETO ====================
-        /// <summary> Descarga el ZIP completo y extrae todos los CFG a CFG/ y los JSON a la caché interna. </summary>
         public async Task<bool> DownloadFullDatabaseAsync(Action<string> onProgress)
         {
             onProgress("Descargando base de datos completa...");
@@ -72,11 +67,8 @@ namespace POPSManager.Android.Services
             {
                 await DownloadFileAsync(url, zipTemp, onProgress);
 
-                // Extraer CFGs a la carpeta CFG del usuario
                 string destCfg = _paths.CfgFolder;
                 Directory.CreateDirectory(destCfg);
-
-                // Extraer JSONs a la caché interna
                 string internalDb = InternalDatabaseFolder;
                 if (Directory.Exists(internalDb))
                     Directory.Delete(internalDb, true);
@@ -106,17 +98,17 @@ namespace POPSManager.Android.Services
             }
             catch (Exception ex)
             {
-                _log.Log($"[DB Update] Error modo completo: {ex.Message}");
+                _log.Log($"[DB] Error modo completo: {ex.Message}");
                 onProgress($"Error: {ex.Message}");
                 return false;
             }
         }
 
         // ==================== MODO SOLO JUEGOS DETECTADOS ====================
-        /// <summary> Descarga el ZIP individual y extrae solo los CFG de los Game IDs proporcionados. </summary>
         public async Task<bool> DownloadIndividualDatabaseAsync(IEnumerable<string> gameIds, Action<string> onProgress)
         {
-            if (gameIds == null || !gameIds.Any())
+            var idList = gameIds?.Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+            if (idList == null || idList.Count == 0)
             {
                 onProgress("No se proporcionaron Game IDs.");
                 return false;
@@ -132,13 +124,11 @@ namespace POPSManager.Android.Services
 
                 string destCfg = _paths.CfgFolder;
                 Directory.CreateDirectory(destCfg);
-
-                var gameIdSet = new HashSet<string>(gameIds, StringComparer.OrdinalIgnoreCase);
+                var gameIdSet = new HashSet<string>(idList, StringComparer.OrdinalIgnoreCase);
 
                 await Task.Run(() =>
                 {
                     using var archive = ZipFile.OpenRead(zipTemp);
-                    // Leer index.json para obtener mapeos rápidos
                     var indexEntry = archive.GetEntry("index.json");
                     if (indexEntry != null)
                     {
@@ -151,10 +141,9 @@ namespace POPSManager.Android.Services
                             if (!gameIdSet.Contains(id)) continue;
 
                             var info = prop.Value;
-                            // Extraer CFG
-                            string cfgRelPath = info.GetProperty("cfg").GetString();
-                            if (!string.IsNullOrWhiteSpace(cfgRelPath))
+                            if (info.TryGetProperty("cfg", out var cfgProp))
                             {
+                                string cfgRelPath = cfgProp.GetString();
                                 var cfgEntry = archive.GetEntry(cfgRelPath);
                                 if (cfgEntry != null)
                                 {
@@ -162,36 +151,20 @@ namespace POPSManager.Android.Services
                                     cfgEntry.ExtractToFile(dest, true);
                                 }
                             }
-                            // (opcional) Extraer JSON con metadatos
-                            string jsonRelPath = info.GetProperty("json").GetString();
-                            if (!string.IsNullOrWhiteSpace(jsonRelPath))
-                            {
-                                var jsonEntry = archive.GetEntry(jsonRelPath);
-                                if (jsonEntry != null)
-                                {
-                                    string destJson = Path.Combine(InternalDatabaseFolder, "data", id + ".json");
-                                    Directory.CreateDirectory(Path.GetDirectoryName(destJson));
-                                    jsonEntry.ExtractToFile(destJson, true);
-                                }
-                            }
                         }
                     }
                     else
                     {
-                        // Si no hay index.json, buscar manualmente en las carpetas cfg/
-                        var cfgFolder = archive.GetEntry("cfg/");
-                        if (cfgFolder != null)
+                        // Fallback: buscar en carpeta cfg/
+                        foreach (var entry in archive.Entries)
                         {
-                            foreach (var entry in archive.Entries)
+                            if (entry.FullName.StartsWith("cfg/") && entry.FullName.EndsWith(".cfg"))
                             {
-                                if (entry.FullName.StartsWith("cfg/") && entry.FullName.EndsWith(".cfg"))
+                                string id = Path.GetFileNameWithoutExtension(entry.Name);
+                                if (gameIdSet.Contains(id))
                                 {
-                                    string id = Path.GetFileNameWithoutExtension(entry.Name);
-                                    if (gameIdSet.Contains(id))
-                                    {
-                                        string dest = Path.Combine(destCfg, entry.Name);
-                                        entry.ExtractToFile(dest, true);
-                                    }
+                                    string dest = Path.Combine(destCfg, entry.Name);
+                                    entry.ExtractToFile(dest, true);
                                 }
                             }
                         }
@@ -204,7 +177,7 @@ namespace POPSManager.Android.Services
             }
             catch (Exception ex)
             {
-                _log.Log($"[DB Update] Error modo individual: {ex.Message}");
+                _log.Log($"[DB] Error modo individual: {ex.Message}");
                 onProgress($"Error: {ex.Message}");
                 return false;
             }
@@ -230,7 +203,7 @@ namespace POPSManager.Android.Services
                 if (total > 0)
                 {
                     int pct = (int)(totalRead * 100 / total);
-                    onProgress($"Descargando... {pct}% ({totalRead / 1024 / 1024} MB)");
+                    onProgress($"Descargando... {pct}%");
                 }
             }
         }
