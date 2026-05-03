@@ -96,8 +96,8 @@ namespace POPSManager.Android.Services
             for (int i = 0; i < all.Count; i++)
             {
                 var g = all[i];
-                string origId = g.OriginalGameId;   // con punto: SLES_013.04
-                string normId = g.GameId;            // sin punto:  SLES_01304
+                string origId = g.OriginalGameId;
+                string normId = g.GameId;
 
                 onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {origId})");
 
@@ -112,24 +112,14 @@ namespace POPSManager.Android.Services
                 { skipped++; continue; }
 
                 bool success = false;
-
-                // 1. Intentar con el ID original (punto) en el mirror
                 string url = $"{mirrorBase}/ART/{origId}.jpg";
-                if (await DownloadFileAsync(url, artFile))
-                {
-                    success = true;
-                }
+                if (await DownloadFileAsync(url, artFile)) success = true;
                 else
                 {
-                    // 2. Probar con ID normalizado en el mirror
                     url = $"{mirrorBase}/ART/{normId}.jpg";
-                    if (await DownloadFileAsync(url, artFile))
-                    {
-                        success = true;
-                    }
+                    if (await DownloadFileAsync(url, artFile)) success = true;
                     else
                     {
-                        // 3. Buscar en la base de datos local
                         string? dbUrl = GameDatabase.TryGetCoverUrl(origId);
                         if (!string.IsNullOrWhiteSpace(dbUrl) && await DownloadFileAsync(dbUrl, artFile))
                             success = true;
@@ -144,7 +134,7 @@ namespace POPSManager.Android.Services
                 }
                 else
                 {
-                    _log.Log($"[Cover] No encontrado: {origId} (también probado como {normId})");
+                    _log.Log($"[Cover] No encontrado: {origId}");
                     failed++;
                 }
             }
@@ -163,15 +153,22 @@ namespace POPSManager.Android.Services
             if (!TestWrite(cfgFolder)) return $"❌ Sin permisos en CFG:\n{cfgFolder}";
 
             string sourceCfg = Path.Combine(InternalDatabaseFolder, "CFG");
+
+            _log.Log($"[DEBUG] Internal DB: {InternalDatabaseFolder}");
+            _log.Log($"[DEBUG] Source CFG: {sourceCfg}");
+            _log.Log($"[DEBUG] Exists: {Directory.Exists(sourceCfg)}");
+
             if (!Directory.Exists(sourceCfg))
                 return "Caché interna no encontrada. Usa 'Actualizar DB' primero.";
 
             int copied = 0, skipped = 0, notFound = 0;
+            var allFiles = Directory.GetFiles(sourceCfg, "*.cfg");
+
             for (int i = 0; i < all.Count; i++)
             {
                 var g = all[i];
-                string origId = g.OriginalGameId;   // con punto
-                string normId = g.GameId;            // sin punto
+                string origId = g.OriginalGameId?.Trim();
+                string normId = g.GameId?.Trim();
 
                 onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {origId})");
 
@@ -182,36 +179,43 @@ namespace POPSManager.Android.Services
                 }
 
                 string dest = Path.Combine(cfgFolder, origId + ".cfg");
-                if (!File.Exists(dest))
+                if (File.Exists(dest))
                 {
-                    string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, origId)
-                                      ?? TryCopyCfg(sourceCfg, cfgFolder, normId);
-                    if (copiedFile != null)
+                    skipped++;
+                    continue;
+                }
+
+                string? match = allFiles.FirstOrDefault(f =>
+                {
+                    string name = Path.GetFileNameWithoutExtension(f);
+                    return name.Equals(origId, StringComparison.OrdinalIgnoreCase) ||
+                           name.Equals(normId, StringComparison.OrdinalIgnoreCase);
+                });
+
+                if (match != null)
+                {
+                    try
                     {
+                        File.Copy(match, dest, true);
                         copied++;
-                        _log.Log($"[Meta] Copiado {origId}.cfg");
+                        _log.Log($"[Meta] Copiado: {Path.GetFileName(match)}");
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _log.Log($"[Meta] No encontrado: {origId}.cfg (ni {normId}.cfg)");
-                        notFound++;
+                        _log.Log($"[Meta][ERROR] {ex.Message}");
                     }
                 }
-                else skipped++;
+                else
+                {
+                    _log.Log($"[Meta] No encontrado: {origId} / {normId}");
+                    notFound++;
+                }
             }
 
             return $"Metadatos: {copied} copiados, {skipped} existían, {notFound} no encontrados.";
         }
 
         // ==================== AUXILIARES ====================
-
-        private static string? TryCopyCfg(string srcDir, string destDir, string id)
-        {
-            string s = Path.Combine(srcDir, id + ".cfg");
-            string d = Path.Combine(destDir, id + ".cfg");
-            if (File.Exists(s)) { try { File.Copy(s, d); return d; } catch { } }
-            return null;
-        }
 
         private static bool TestWrite(string folder)
         {
