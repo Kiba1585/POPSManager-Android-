@@ -170,7 +170,8 @@ namespace POPSManager.Android.Services
                 string txt = Path.Combine(common, "DISCS.TXT");
                 if (!File.Exists(txt))
                 {
-                    await File.WriteAllLinesAsync(txt, discs.Select(d => Path.GetFileName(d.FilePath)));
+                    var fileNames = discs.Select(d => Path.GetFileName(d.FilePath)).Where(f => f != null).Cast<string>().ToList();
+                    await File.WriteAllLinesAsync(txt, fileNames);
                     _log.Log($"[Multidisco] Creado {txt}");
                 }
 
