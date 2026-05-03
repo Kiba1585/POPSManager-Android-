@@ -65,18 +65,17 @@
                         Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
                 <Button Text="✏️ Renombrar juegos" Command="{Binding RenameAllCommand}"
                         Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
-
-                <!-- Modo de actualización -->
-                <HorizontalStackLayout Spacing="10" Margin="0,5">
-                    <Switch IsToggled="{Binding IsUpdateModeIndividual}" OnColor="{StaticResource AccentBlue}" />
-                    <Label Text="Solo juegos detectados" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}" />
-                </HorizontalStackLayout>
-
-                <Button Text="📦 Actualizar DB" Command="{Binding UpdateDatabaseCommand}"
-                        Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
                 <Button Text="🔄 Refrescar listas" Command="{Binding RefreshCommand}"
                         Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
             </FlexLayout>
+
+            <!-- Modo de actualización + botón -->
+            <HorizontalStackLayout Spacing="10" Margin="0,-5,0,0">
+                <Switch IsToggled="{Binding IsUpdateModeIndividual}" OnColor="{StaticResource AccentBlue}" />
+                <Label Text="Solo juegos detectados" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}" />
+            </HorizontalStackLayout>
+            <Button Text="📦 Actualizar DB" Command="{Binding UpdateDatabaseCommand}"
+                    Style="{StaticResource SecondaryButton}" />
 
             <!-- Estado -->
             <Label Text="{Binding Status}" Style="{StaticResource StatusLabel}" />
