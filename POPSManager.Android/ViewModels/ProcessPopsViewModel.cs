@@ -1,7 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using POPSManager.Core.Logic;          // ← Necesario para GameDatabase
+using POPSManager.Core.Logic;
 using POPSManager.Core.Services;
 using POPSManager.Android.Models;
 using POPSManager.Android.Services;
@@ -66,18 +66,19 @@ public class ProcessPopsViewModel : BindableObject
 
         SelectOplRootFolderCommand = new Command(async () => await SelectOplRootFolder());
         ProcessAllCommand = new Command(async () => await ProcessAllGames());
-        GenerateElfCommand = new Command(async () => await RunWithStatus(() => _processingService.GenerateAllElfsAsync()));
-        GenerateCheatsCommand = new Command(async () => await RunWithStatus(() => _processingService.GenerateAllCheatsAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics)));
-        DownloadCoversAndMetadataCommand = new Command(async () => await RunWithStatus(() => _assetService.DownloadCoversAndMetadataAsync()));
+        GenerateElfCommand = new Command(async () => await GenerateAllElfs());
+        GenerateCheatsCommand = new Command(async () => await GenerateAllCheats());
+        DownloadCoversAndMetadataCommand = new Command(async () => await DownloadCoversAndMetadata());
         RefreshCommand = new Command(() => Status = _listService.Refresh());
-        RenameAllCommand = new Command(async () => await RunWithStatus(() => _processingService.RenameAllAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics)));
+        RenameAllCommand = new Command(async () => await RenameAllGames());
         OpenStorageSettingsCommand = new Command(OpenStorageSettings);
-        UpdateDatabaseCommand = new Command(async () => await RunWithStatus(() => _assetService.UpdateDatabaseAsync()));
+        UpdateDatabaseCommand = new Command(async () => await UpdateDatabase());
 
         RefreshFromSettings();
     }
 
-    private async Task RunWithStatus(Func<Task<string>> action) => Status = await action();
+    private void ReportProgress(string msg) =>
+        MainThread.BeginInvokeOnMainThread(() => Status = msg);
 
     public void RefreshFromSettings()
     {
@@ -105,14 +106,33 @@ public class ProcessPopsViewModel : BindableObject
         }
     }
 
+    private async Task UpdateDatabase()
+    {
+        Status = await _assetService.UpdateDatabaseAsync(ReportProgress);
+    }
+
+    private async Task DownloadCoversAndMetadata()
+    {
+        Status = await _assetService.DownloadCoversAndMetadataAsync(ReportProgress);
+    }
+
     private async Task ProcessAllGames()
     {
         if (!_listService.Ps1Games.Any() && !_listService.Ps2Games.Any()) { Status = "No hay juegos."; return; }
         Status = await _processingService.GenerateAllElfsAsync();
         Status = await _processingService.GenerateAllCheatsAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics);
-        Status = await _assetService.DownloadCoversAndMetadataAsync();
+        Status = await _assetService.DownloadCoversAndMetadataAsync(ReportProgress);
         Status = "Procesamiento completo.";
     }
+
+    private async Task GenerateAllElfs() =>
+        Status = await _processingService.GenerateAllElfsAsync();
+
+    private async Task GenerateAllCheats() =>
+        Status = await _processingService.GenerateAllCheatsAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics);
+
+    private async Task RenameAllGames() =>
+        Status = await _processingService.RenameAllAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics);
 
     private void OpenStorageSettings()
     {
