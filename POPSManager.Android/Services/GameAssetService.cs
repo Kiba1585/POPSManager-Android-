@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using POPSManager.Core.Logic;
 using POPSManager.Core.Logic.Covers;
 using POPSManager.Core.Services;
-using static POPSManager.Android.Services.DatabaseUpdater;
 
 namespace POPSManager.Android.Services
 {
@@ -16,40 +15,81 @@ namespace POPSManager.Android.Services
         private readonly IPathsService _paths;
         private readonly ILoggingService _log;
         private readonly GameListService _listService;
+        private readonly DatabaseUpdaterService _dbUpdater;
 
-        public GameAssetService(IPathsService paths, ILoggingService log, GameListService listService)
+        public GameAssetService(IPathsService paths, ILoggingService log,
+            GameListService listService, DatabaseUpdaterService dbUpdater)
         {
             _paths = paths;
             _log = log;
             _listService = listService;
+            _dbUpdater = dbUpdater;
         }
 
-        /// <summary>
-        /// Actualiza la base de datos interna, mostrando progreso mediante <paramref name="onProgress"/>.
-        /// </summary>
-        public async Task<string> UpdateDatabaseAsync(Action<string> onProgress)
-        {
-            var ids = _listService.Ps1Games.Select(g => g.OriginalGameId)
-                      .Concat(_listService.Ps2Games.Select(g => g.OriginalGameId))
-                      .Where(id => !string.IsNullOrWhiteSpace(id));
+        // ==================== MODOS DE ACTUALIZACIÓN ====================
 
-            bool ok = await DatabaseUpdater.DownloadAndExtractDatabaseAsync(_paths.RootFolder, ids, onProgress);
-            if (ok)
+        /// <summary> Comprueba si hay nueva versión y la descarga en modo completo. </summary>
+        public async Task<string> CheckAndUpdateFullAsync(Action<string> onProgress)
+        {
+            var (newAvailable, tag) = await _dbUpdater.CheckForUpdateAsync();
+            if (!newAvailable || string.IsNullOrWhiteSpace(tag))
             {
-                GameDatabase.Initialize(InternalDatabaseFolder);
+                onProgress("Base de datos ya actualizada.");
                 return "Base de datos actualizada.";
             }
-            return "Error al actualizar la base de datos.";
+
+            onProgress($"Nueva versión: {tag}. Descargando base completa...");
+            bool ok = await _dbUpdater.DownloadFullDatabaseAsync(onProgress);
+            if (ok)
+            {
+                _dbUpdater.SaveVersion(tag);
+                GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
+                return "Base de datos completa actualizada.";
+            }
+            return "Error al actualizar la base de datos completa.";
         }
 
-        /// <summary> Descarga las carátulas (covers) de los juegos listados. </summary>
+        /// <summary> Descarga solo los metadatos de los juegos detectados. </summary>
+        public async Task<string> UpdateIndividualAsync(Action<string> onProgress)
+        {
+            var (newAvailable, tag) = await _dbUpdater.CheckForUpdateAsync();
+            if (!newAvailable || string.IsNullOrWhiteSpace(tag))
+            {
+                onProgress("Base de datos ya actualizada.");
+                return "Base de datos actualizada.";
+            }
+
+            var allIds = _listService.Ps1Games.Select(g => g.GameId)
+                         .Concat(_listService.Ps2Games.Select(g => g.GameId))
+                         .Where(id => !string.IsNullOrWhiteSpace(id))
+                         .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            if (!allIds.Any())
+            {
+                onProgress("No hay juegos detectados. Descargue la base completa.");
+                return "No hay juegos.";
+            }
+
+            onProgress($"Nueva versión: {tag}. Descargando metadatos de {allIds.Count()} juegos...");
+            bool ok = await _dbUpdater.DownloadIndividualDatabaseAsync(allIds, onProgress);
+            if (ok)
+            {
+                _dbUpdater.SaveVersion(tag);
+                GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
+                return "Metadatos de juegos detectados actualizados.";
+            }
+            return "Error al actualizar metadatos individuales.";
+        }
+
+        // ==================== COVERS ====================
+
         public async Task<string> DownloadCoversAsync(Action<string> onProgress)
         {
             var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
             if (!all.Any()) return "No hay juegos.";
 
             string artFolder = _paths.ArtFolder;
-            if (!TestWrite(artFolder)) return $"❌ Sin permisos de escritura en ART:\n{artFolder}";
+            if (!TestWrite(artFolder)) return $"❌ Sin permisos en ART:\n{artFolder}";
 
             int downloaded = 0, skipped = 0, failed = 0;
             string mirror = "https://archive.org/download/oplm-art-2023-11";
@@ -88,7 +128,8 @@ namespace POPSManager.Android.Services
             return $"Covers: {downloaded} desc, {skipped} existen, {failed} no encontrados.";
         }
 
-        /// <summary> Copia los metadatos (.cfg) desde la caché interna a la carpeta CFG del destino. </summary>
+        // ==================== METADATOS ====================
+
         public async Task<string> CopyMetadataAsync(Action<string> onProgress)
         {
             var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
@@ -97,9 +138,9 @@ namespace POPSManager.Android.Services
             string cfgFolder = _paths.CfgFolder;
             if (!TestWrite(cfgFolder)) return $"❌ Sin permisos en CFG:\n{cfgFolder}";
 
-            string sourceCfg = Path.Combine(InternalDatabaseFolder, "CFG");
+            string sourceCfg = Path.Combine(DatabaseUpdaterService.InternalDatabaseFolder, "CFG");
             if (!Directory.Exists(sourceCfg))
-                return "Caché interna no encontrada. Usa 'Actualizar DB'.";
+                return "Caché interna no encontrada. Usa 'Actualizar BD'.";
 
             int copied = 0, skipped = 0, notFound = 0;
             for (int i = 0; i < all.Count; i++)
@@ -116,7 +157,6 @@ namespace POPSManager.Android.Services
                 string dest = Path.Combine(cfgFolder, g.GameId + ".cfg");
                 if (!File.Exists(dest))
                 {
-                    // PRIMERO intentar con el ID normalizado (sin punto), DESPUÉS con el original
                     string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, g.GameId)
                                       ?? TryCopyCfg(sourceCfg, cfgFolder, g.OriginalGameId);
                     if (copiedFile != null)
@@ -135,6 +175,8 @@ namespace POPSManager.Android.Services
 
             return $"Metadatos: {copied} copiados, {skipped} existían, {notFound} no encontrados.";
         }
+
+        // ==================== AUXILIARES ====================
 
         private static string? TryCopyCfg(string srcDir, string destDir, string id)
         {
