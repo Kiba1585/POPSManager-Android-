@@ -46,6 +46,7 @@ public static class MauiProgram
         // Servicios Android
         builder.Services.AddSingleton<GameListService>();
         builder.Services.AddSingleton<GameProcessingService>();
+        builder.Services.AddSingleton<DatabaseUpdaterService>();
         builder.Services.AddSingleton<GameAssetService>();
 
         // ViewModels
