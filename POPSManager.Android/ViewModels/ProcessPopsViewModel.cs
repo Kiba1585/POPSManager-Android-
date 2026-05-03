@@ -62,6 +62,7 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand RenameAllCommand { get; }
     public ICommand OpenStorageSettingsCommand { get; }
     public ICommand UpdateDatabaseCommand { get; }
+    public ICommand DebugIdsCommand { get; }   // ← NUEVO
 
     public ProcessPopsViewModel(IPathsService paths, SettingsService settings,
         GameListService listService, GameProcessingService processingService, GameAssetService assetService)
@@ -82,6 +83,7 @@ public class ProcessPopsViewModel : BindableObject
         RenameAllCommand = new Command(async () => await RenameAllGames());
         OpenStorageSettingsCommand = new Command(OpenStorageSettings);
         UpdateDatabaseCommand = new Command(async () => await UpdateDatabase());
+        DebugIdsCommand = new Command(() => Status = _assetService.GetDebugIds());   // ← NUEVO
 
         RefreshFromSettings();
     }
