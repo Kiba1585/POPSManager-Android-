@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using POPSManager.Core.Logic;
 using POPSManager.Core.Logic.Covers;
 using POPSManager.Core.Services;
+using static POPSManager.Android.Services.DatabaseUpdater;
 
 namespace POPSManager.Android.Services
 {
@@ -28,7 +29,6 @@ namespace POPSManager.Android.Services
 
         // ==================== MODOS DE ACTUALIZACIÓN ====================
 
-        /// <summary> Comprueba si hay nueva versión y la descarga en modo completo. </summary>
         public async Task<string> CheckAndUpdateFullAsync(Action<string> onProgress)
         {
             var (newAvailable, tag) = await _dbUpdater.CheckForUpdateAsync();
@@ -43,13 +43,12 @@ namespace POPSManager.Android.Services
             if (ok)
             {
                 _dbUpdater.SaveVersion(tag);
-                GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
+                GameDatabase.Initialize(InternalDatabaseFolder);
                 return "Base de datos completa actualizada.";
             }
             return "Error al actualizar la base de datos completa.";
         }
 
-        /// <summary> Descarga solo los metadatos de los juegos detectados. </summary>
         public async Task<string> UpdateIndividualAsync(Action<string> onProgress)
         {
             var (newAvailable, tag) = await _dbUpdater.CheckForUpdateAsync();
@@ -62,20 +61,20 @@ namespace POPSManager.Android.Services
             var allIds = _listService.Ps1Games.Select(g => g.GameId)
                          .Concat(_listService.Ps2Games.Select(g => g.GameId))
                          .Where(id => !string.IsNullOrWhiteSpace(id))
-                         .Distinct(StringComparer.OrdinalIgnoreCase);
+                         .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-            if (!allIds.Any())
+            if (allIds.Count == 0)
             {
                 onProgress("No hay juegos detectados. Descargue la base completa.");
                 return "No hay juegos.";
             }
 
-            onProgress($"Nueva versión: {tag}. Descargando metadatos de {allIds.Count()} juegos...");
+            onProgress($"Nueva versión: {tag}. Descargando metadatos de {allIds.Count} juegos...");
             bool ok = await _dbUpdater.DownloadIndividualDatabaseAsync(allIds, onProgress);
             if (ok)
             {
                 _dbUpdater.SaveVersion(tag);
-                GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
+                GameDatabase.Initialize(InternalDatabaseFolder);
                 return "Metadatos de juegos detectados actualizados.";
             }
             return "Error al actualizar metadatos individuales.";
@@ -97,32 +96,41 @@ namespace POPSManager.Android.Services
             for (int i = 0; i < all.Count; i++)
             {
                 var g = all[i];
-                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {g.OriginalGameId})");
+                string displayId = g.OriginalGameId;
+                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {displayId})");
 
-                if (string.IsNullOrWhiteSpace(g.OriginalGameId))
+                if (string.IsNullOrWhiteSpace(displayId))
                 {
                     _log.Log($"[Cover] Sin ID: {g.Name}");
                     continue;
                 }
 
-                string art = Path.Combine(artFolder, g.OriginalGameId + ".jpg");
-                if (!File.Exists(art) || new FileInfo(art).Length < 1000)
+                string art = Path.Combine(artFolder, displayId + ".jpg");
+                if (File.Exists(art) && new FileInfo(art).Length >= 1000)
                 {
-                    string url = GameDatabase.TryGetCoverUrl(g.OriginalGameId)
-                                 ?? $"{mirror}/ART/{g.OriginalGameId}.jpg";
-                    if (await DownloadFileAsync(url, art))
-                    {
-                        try { ArtResizer.ResizeToArt(art, art.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
-                        catch { }
-                        downloaded++;
-                    }
-                    else
-                    {
-                        _log.Log($"[Cover] No disponible para {g.OriginalGameId}");
-                        failed++;
-                    }
+                    skipped++;
+                    continue;
                 }
-                else skipped++;
+
+                // Intentar primero con URL de la base de datos (si existe)
+                string? url = GameDatabase.TryGetCoverUrl(displayId);
+                if (url == null)
+                {
+                    // Fallback al mirror público con el ID original (con punto)
+                    url = $"{mirror}/ART/{displayId}.jpg";
+                }
+
+                if (await DownloadFileAsync(url, art))
+                {
+                    try { ArtResizer.ResizeToArt(art, art.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
+                    catch { }
+                    downloaded++;
+                }
+                else
+                {
+                    _log.Log($"[Cover] No disponible para {displayId}");
+                    failed++;
+                }
             }
 
             return $"Covers: {downloaded} desc, {skipped} existen, {failed} no encontrados.";
@@ -138,7 +146,7 @@ namespace POPSManager.Android.Services
             string cfgFolder = _paths.CfgFolder;
             if (!TestWrite(cfgFolder)) return $"❌ Sin permisos en CFG:\n{cfgFolder}";
 
-            string sourceCfg = Path.Combine(DatabaseUpdaterService.InternalDatabaseFolder, "CFG");
+            string sourceCfg = Path.Combine(InternalDatabaseFolder, "CFG");
             if (!Directory.Exists(sourceCfg))
                 return "Caché interna no encontrada. Usa 'Actualizar BD'.";
 
@@ -146,27 +154,29 @@ namespace POPSManager.Android.Services
             for (int i = 0; i < all.Count; i++)
             {
                 var g = all[i];
-                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {g.GameId})");
+                string searchId = g.GameId; // ID normalizado (sin punto)
+                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {searchId})");
 
-                if (string.IsNullOrWhiteSpace(g.GameId))
+                if (string.IsNullOrWhiteSpace(searchId))
                 {
                     _log.Log($"[Meta] Sin ID: {g.Name}");
                     continue;
                 }
 
-                string dest = Path.Combine(cfgFolder, g.GameId + ".cfg");
+                string dest = Path.Combine(cfgFolder, searchId + ".cfg");
                 if (!File.Exists(dest))
                 {
-                    string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, g.GameId)
+                    // PRIMERO intentar con el ID normalizado (sin punto), DESPUÉS con el original
+                    string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, searchId)
                                       ?? TryCopyCfg(sourceCfg, cfgFolder, g.OriginalGameId);
                     if (copiedFile != null)
                     {
                         copied++;
-                        _log.Log($"[Meta] Copiado {g.GameId}.cfg");
+                        _log.Log($"[Meta] Copiado {searchId}.cfg");
                     }
                     else
                     {
-                        _log.Log($"[Meta] No se encuentra {g.GameId}.cfg (buscado también como {g.OriginalGameId})");
+                        _log.Log($"[Meta] No se encuentra {searchId}.cfg (buscado también como {g.OriginalGameId})");
                         notFound++;
                     }
                 }
