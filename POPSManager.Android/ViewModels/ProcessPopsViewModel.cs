@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using POPSManager.Core.Logic;          // ← Necesario para GameDatabase
 using POPSManager.Core.Services;
 using POPSManager.Android.Models;
 using POPSManager.Android.Services;
