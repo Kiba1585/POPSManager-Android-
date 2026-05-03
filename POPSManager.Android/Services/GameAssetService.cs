@@ -24,6 +24,9 @@ namespace POPSManager.Android.Services
             _listService = listService;
         }
 
+        /// <summary>
+        /// Actualiza la base de datos interna, mostrando progreso mediante <paramref name="onProgress"/>.
+        /// </summary>
         public async Task<string> UpdateDatabaseAsync(Action<string> onProgress)
         {
             var ids = _listService.Ps1Games.Select(g => g.OriginalGameId)
@@ -39,13 +42,14 @@ namespace POPSManager.Android.Services
             return "Error al actualizar la base de datos.";
         }
 
+        /// <summary> Descarga las carátulas (covers) de los juegos listados. </summary>
         public async Task<string> DownloadCoversAsync(Action<string> onProgress)
         {
             var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
             if (!all.Any()) return "No hay juegos.";
 
             string artFolder = _paths.ArtFolder;
-            if (!TestWrite(artFolder)) return $"❌ Sin permisos en ART:\n{artFolder}";
+            if (!TestWrite(artFolder)) return $"❌ Sin permisos de escritura en ART:\n{artFolder}";
 
             int downloaded = 0, skipped = 0, failed = 0;
             string mirror = "https://archive.org/download/oplm-art-2023-11";
@@ -84,6 +88,7 @@ namespace POPSManager.Android.Services
             return $"Covers: {downloaded} desc, {skipped} existen, {failed} no encontrados.";
         }
 
+        /// <summary> Copia los metadatos (.cfg) desde la caché interna a la carpeta CFG del destino. </summary>
         public async Task<string> CopyMetadataAsync(Action<string> onProgress)
         {
             var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
@@ -100,36 +105,35 @@ namespace POPSManager.Android.Services
             for (int i = 0; i < all.Count; i++)
             {
                 var g = all[i];
-                string gameId = g.OriginalGameId;
-                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {gameId})");
+                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {g.GameId})");
 
-                if (string.IsNullOrWhiteSpace(gameId))
+                if (string.IsNullOrWhiteSpace(g.GameId))
                 {
                     _log.Log($"[Meta] Sin ID: {g.Name}");
                     continue;
                 }
 
-                string dest = Path.Combine(cfgFolder, gameId + ".cfg");
+                string dest = Path.Combine(cfgFolder, g.GameId + ".cfg");
                 if (!File.Exists(dest))
                 {
-                    string src = Path.Combine(sourceCfg, gameId + ".cfg");
-                    string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, gameId)
-                                      ?? TryCopyCfg(sourceCfg, cfgFolder, g.GameId);
+                    // PRIMERO intentar con el ID normalizado (sin punto), DESPUÉS con el original
+                    string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, g.GameId)
+                                      ?? TryCopyCfg(sourceCfg, cfgFolder, g.OriginalGameId);
                     if (copiedFile != null)
                     {
                         copied++;
-                        _log.Log($"[Meta] Copiado {gameId}.cfg");
+                        _log.Log($"[Meta] Copiado {g.GameId}.cfg");
                     }
                     else
                     {
-                        _log.Log($"[Meta] No se encuentra {gameId}.cfg (buscado en {src})");
+                        _log.Log($"[Meta] No se encuentra {g.GameId}.cfg (buscado también como {g.OriginalGameId})");
                         notFound++;
                     }
                 }
                 else skipped++;
             }
 
-            return $"Metadatos: {copied} copiados, {skipped} existen, {notFound} no encontrados.";
+            return $"Metadatos: {copied} copiados, {skipped} existían, {notFound} no encontrados.";
         }
 
         private static string? TryCopyCfg(string srcDir, string destDir, string id)
