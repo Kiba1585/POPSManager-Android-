@@ -72,6 +72,64 @@ namespace POPSManager.Android.Services
                 .ToUpperInvariant() ?? "";
         }
 
+        // ==================== MODOS DE ACTUALIZACIÓN ====================
+
+        public async Task<string> CheckAndUpdateFullAsync(Action<string> onProgress)
+        {
+            var (newAvailable, tag) = await _dbUpdater.CheckForUpdateAsync();
+            if (!newAvailable || string.IsNullOrWhiteSpace(tag))
+            {
+                onProgress("Base de datos ya actualizada.");
+                return "Base de datos actualizada.";
+            }
+
+            onProgress($"Nueva versión: {tag}. Descargando base completa...");
+            bool ok = await _dbUpdater.DownloadFullDatabaseAsync(onProgress);
+            if (ok)
+            {
+                _dbUpdater.SaveVersion(tag);
+                GameDatabase.Initialize(InternalDatabaseFolder);
+                // Reiniciar índice porque los CFG se han actualizado
+                _indexBuilt = false;
+                _cfgIndex.Clear();
+                return "Base de datos completa actualizada.";
+            }
+            return "Error al actualizar la base de datos completa.";
+        }
+
+        public async Task<string> UpdateIndividualAsync(Action<string> onProgress)
+        {
+            var (newAvailable, tag) = await _dbUpdater.CheckForUpdateAsync();
+            if (!newAvailable || string.IsNullOrWhiteSpace(tag))
+            {
+                onProgress("Base de datos ya actualizada.");
+                return "Base de datos actualizada.";
+            }
+
+            var allIds = _listService.Ps1Games.Select(g => g.GameId)
+                         .Concat(_listService.Ps2Games.Select(g => g.GameId))
+                         .Where(id => !string.IsNullOrWhiteSpace(id))
+                         .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+            if (allIds.Count == 0)
+            {
+                onProgress("No hay juegos detectados. Descargue la base completa.");
+                return "No hay juegos.";
+            }
+
+            onProgress($"Nueva versión: {tag}. Descargando metadatos de {allIds.Count} juegos...");
+            bool ok = await _dbUpdater.DownloadIndividualDatabaseAsync(allIds, onProgress);
+            if (ok)
+            {
+                _dbUpdater.SaveVersion(tag);
+                GameDatabase.Initialize(InternalDatabaseFolder);
+                _indexBuilt = false;
+                _cfgIndex.Clear();
+                return "Metadatos de juegos detectados actualizados.";
+            }
+            return "Error al actualizar metadatos individuales.";
+        }
+
         // ==================== METADATOS ====================
 
         public async Task<string> CopyMetadataAsync(Action<string> onProgress)
@@ -234,6 +292,8 @@ namespace POPSManager.Android.Services
 
             return $"🎮 Juegos:\n{string.Join("\n", games)}\n\n📄 CFGs en caché:\n{string.Join("\n", files)}";
         }
+
+        // ==================== AUXILIARES ====================
 
         private static bool TestWrite(string folder)
         {
