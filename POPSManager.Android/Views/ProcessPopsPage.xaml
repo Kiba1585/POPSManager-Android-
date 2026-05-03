@@ -55,14 +55,31 @@
             <!-- Acciones -->
             <Label Text="⚡ Acciones" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
             <FlexLayout Wrap="Wrap" JustifyContent="Start">
-                <Button Text="🚀 Procesar todo" Command="{Binding ProcessAllCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
-                <Button Text="🧩 Generar ELFs" Command="{Binding GenerateElfCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
-                <Button Text="🎯 Generar Cheats" Command="{Binding GenerateCheatsCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
-                <Button Text="🖼️ Covers y Metadatos" Command="{Binding DownloadCoversAndMetadataCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,10" />
-                <Button Text="✏️ Renombrar juegos" Command="{Binding RenameAllCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
-                <Button Text="📦 Actualizar DB" Command="{Binding UpdateDatabaseCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
-                <Button Text="🔄 Refrescar listas" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,10" />
-            </FlexLayout>
+    <Button Text="Procesar todo"
+            Command="{Binding ProcessAllCommand}"
+            BackgroundColor="#2FA0D8" TextColor="White" Margin="0,0,10,10" />
+    <Button Text="Generar ELFs"
+            Command="{Binding GenerateElfCommand}"
+            BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+    <Button Text="Generar Cheats"
+            Command="{Binding GenerateCheatsCommand}"
+            BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+    <Button Text="Descargar Covers"
+            Command="{Binding DownloadCoversCommand}"
+            BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+    <Button Text="Copiar Metadatos"
+            Command="{Binding CopyMetadataCommand}"
+            BackgroundColor="#4CC2FF" TextColor="White" Margin="0,0,10,10" />
+    <Button Text="Renombrar juegos"
+            Command="{Binding RenameAllCommand}"
+            BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
+    <Button Text="Actualizar DB"
+            Command="{Binding UpdateDatabaseCommand}"
+            BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
+    <Button Text="Refrescar listas"
+            Command="{Binding RefreshCommand}"
+            BackgroundColor="#2D2D2D" TextColor="White" Margin="0,0,10,10" />
+</FlexLayout>
 
             <!-- Estado -->
             <Label Text="{Binding Status}" Style="{StaticResource StatusLabel}" />
