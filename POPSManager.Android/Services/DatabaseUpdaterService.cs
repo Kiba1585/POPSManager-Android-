@@ -67,12 +67,15 @@ namespace POPSManager.Android.Services
             {
                 await DownloadFileAsync(url, zipTemp, onProgress);
 
-                string destCfg = _paths.CfgFolder;
-                Directory.CreateDirectory(destCfg);
                 string internalDb = InternalDatabaseFolder;
+                string internalCfg = Path.Combine(internalDb, "CFG");
+
+                // Limpiar y recrear carpeta interna
                 if (Directory.Exists(internalDb))
                     Directory.Delete(internalDb, true);
-                Directory.CreateDirectory(internalDb);
+                Directory.CreateDirectory(internalCfg);
+
+                _log.Log($"[DB] Extrayendo a: {internalDb}");
 
                 await Task.Run(() =>
                 {
@@ -81,7 +84,7 @@ namespace POPSManager.Android.Services
                     {
                         if (entry.FullName.StartsWith("CFG/") && entry.FullName.EndsWith(".cfg"))
                         {
-                            string destPath = Path.Combine(destCfg, entry.Name);
+                            string destPath = Path.Combine(internalCfg, entry.Name);
                             entry.ExtractToFile(destPath, true);
                         }
                         else if (entry.FullName == "ps1db.json" || entry.FullName == "ps2db.json")
@@ -122,13 +125,15 @@ namespace POPSManager.Android.Services
             {
                 await DownloadFileAsync(url, zipTemp, onProgress);
 
-                string destCfg = _paths.CfgFolder;
-                Directory.CreateDirectory(destCfg);
+                string internalCfg = Path.Combine(InternalDatabaseFolder, "CFG");
+                Directory.CreateDirectory(internalCfg);
+
                 var gameIdSet = new HashSet<string>(idList, StringComparer.OrdinalIgnoreCase);
 
                 await Task.Run(() =>
                 {
                     using var archive = ZipFile.OpenRead(zipTemp);
+                    // Buscar archivos en carpeta cfg/ o mediante index.json
                     var indexEntry = archive.GetEntry("index.json");
                     if (indexEntry != null)
                     {
@@ -147,7 +152,7 @@ namespace POPSManager.Android.Services
                                 var cfgEntry = archive.GetEntry(cfgRelPath);
                                 if (cfgEntry != null)
                                 {
-                                    string dest = Path.Combine(destCfg, id + ".cfg");
+                                    string dest = Path.Combine(internalCfg, id + ".cfg");
                                     cfgEntry.ExtractToFile(dest, true);
                                 }
                             }
@@ -155,7 +160,6 @@ namespace POPSManager.Android.Services
                     }
                     else
                     {
-                        // Fallback: buscar en carpeta cfg/
                         foreach (var entry in archive.Entries)
                         {
                             if (entry.FullName.StartsWith("cfg/") && entry.FullName.EndsWith(".cfg"))
@@ -163,7 +167,7 @@ namespace POPSManager.Android.Services
                                 string id = Path.GetFileNameWithoutExtension(entry.Name);
                                 if (gameIdSet.Contains(id))
                                 {
-                                    string dest = Path.Combine(destCfg, entry.Name);
+                                    string dest = Path.Combine(internalCfg, entry.Name);
                                     entry.ExtractToFile(dest, true);
                                 }
                             }
