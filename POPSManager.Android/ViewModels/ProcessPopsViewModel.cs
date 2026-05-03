@@ -49,7 +49,8 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand ProcessAllCommand { get; }
     public ICommand GenerateElfCommand { get; }
     public ICommand GenerateCheatsCommand { get; }
-    public ICommand DownloadCoversAndMetadataCommand { get; }
+    public ICommand DownloadCoversCommand { get; }        // NUEVO
+    public ICommand CopyMetadataCommand { get; }          // NUEVO
     public ICommand RefreshCommand { get; }
     public ICommand RenameAllCommand { get; }
     public ICommand OpenStorageSettingsCommand { get; }
@@ -68,7 +69,8 @@ public class ProcessPopsViewModel : BindableObject
         ProcessAllCommand = new Command(async () => await ProcessAllGames());
         GenerateElfCommand = new Command(async () => await GenerateAllElfs());
         GenerateCheatsCommand = new Command(async () => await GenerateAllCheats());
-        DownloadCoversAndMetadataCommand = new Command(async () => await DownloadCoversAndMetadata());
+        DownloadCoversCommand = new Command(async () => await DownloadCovers());
+        CopyMetadataCommand = new Command(async () => await CopyMetadata());
         RefreshCommand = new Command(() => Status = _listService.Refresh());
         RenameAllCommand = new Command(async () => await RenameAllGames());
         OpenStorageSettingsCommand = new Command(OpenStorageSettings);
@@ -106,22 +108,22 @@ public class ProcessPopsViewModel : BindableObject
         }
     }
 
-    private async Task UpdateDatabase()
-    {
+    private async Task UpdateDatabase() =>
         Status = await _assetService.UpdateDatabaseAsync(ReportProgress);
-    }
 
-    private async Task DownloadCoversAndMetadata()
-    {
-        Status = await _assetService.DownloadCoversAndMetadataAsync(ReportProgress);
-    }
+    private async Task DownloadCovers() =>
+        Status = await _assetService.DownloadCoversAsync(ReportProgress);
+
+    private async Task CopyMetadata() =>
+        Status = await _assetService.CopyMetadataAsync(ReportProgress);
 
     private async Task ProcessAllGames()
     {
         if (!_listService.Ps1Games.Any() && !_listService.Ps2Games.Any()) { Status = "No hay juegos."; return; }
         Status = await _processingService.GenerateAllElfsAsync();
         Status = await _processingService.GenerateAllCheatsAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics);
-        Status = await _assetService.DownloadCoversAndMetadataAsync(ReportProgress);
+        await DownloadCovers();
+        await CopyMetadata();
         Status = "Procesamiento completo.";
     }
 
