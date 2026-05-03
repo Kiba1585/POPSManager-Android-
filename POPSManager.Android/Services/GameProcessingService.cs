@@ -30,10 +30,8 @@ namespace POPSManager.Android.Services
             var ps2 = _listService.Ps2Games;
             if (!ps1.Any() && !ps2.Any()) return "No hay juegos para renombrar.";
 
-            // 1. Detectar y crear estructura multidisco
             CreateMultidiscStructure(ps1);
 
-            // 2. Renombrar
             int renamed = 0, skipped = 0;
             var errors = new List<string>();
 
@@ -97,54 +95,67 @@ namespace POPSManager.Android.Services
             return msg;
         }
 
-        // ... (GenerateAllElfsAsync, GenerateAllCheatsAsync, ProcessMultidiscAsync se mantienen igual)
+        // ... (GenerateAllElfsAsync, GenerateAllCheatsAsync, ProcessMultidiscAsync se mantienen igual que antes)
 
-        /// <summary> Crea DISCS.TXT y asigna números de disco basándose en la agrupación inteligente de archivos VCD. </summary>
         private void CreateMultidiscStructure(ObservableCollection<GameItem> ps1Games)
         {
-            var allVcds = Directory.GetFiles(_paths.PopsFolder, "*.VCD", SearchOption.TopDirectoryOnly)
-                .Concat(Directory.GetFiles(_paths.PopsFolder, "*.vcd", SearchOption.TopDirectoryOnly))
-                .ToList();
+            // 1. Agrupar por Game ID normalizado
+            var groups = ps1Games
+                .Where(g => !string.IsNullOrWhiteSpace(g.GameId))
+                .GroupBy(g => g.GameId, StringComparer.OrdinalIgnoreCase)
+                .Where(grp => grp.Count() > 1);
 
-            // Agrupar por nombre base, eliminando cualquier sufijo de disco común
-            var groups = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var file in allVcds)
+            foreach (var grp in groups)
             {
-                string fullName = Path.GetFileNameWithoutExtension(file);
-                // Intentar extraer nombre base eliminando: (CD x), (Disc x), CD x, Disc x, (Disco x), etc.
-                string baseName = Regex.Replace(fullName, @"\s*\((CD|Disc|Disco)\s*\d\)", "", RegexOptions.IgnoreCase);
-                baseName = Regex.Replace(baseName, @"\s*(CD|Disc|Disco)\s*\d", "", RegexOptions.IgnoreCase).Trim();
-
-                // Si después de limpiar no cambió, usar el nombre completo como base
-                if (string.IsNullOrWhiteSpace(baseName) || baseName == fullName)
-                    baseName = fullName;
-
-                if (!groups.ContainsKey(baseName))
-                    groups[baseName] = new List<string>();
-                groups[baseName].Add(file);
-            }
-
-            // Para cada grupo con más de un archivo, crear la estructura multidisco
-            foreach (var grp in groups.Where(g => g.Value.Count > 1))
-            {
-                var files = grp.Value.OrderBy(f => f).ToList();
-                string commonFolder = Path.Combine(_paths.PopsFolder, grp.Key);
+                var discs = grp.OrderBy(g => g.DiscNumber).ToList();
+                string baseName = discs.First().Name;
+                baseName = Regex.Replace(baseName, @"\s*\(CD\d\)", "").Trim();
+                string commonFolder = Path.Combine(_paths.PopsFolder, baseName);
                 Directory.CreateDirectory(commonFolder);
 
                 string txt = Path.Combine(commonFolder, "DISCS.TXT");
                 if (!File.Exists(txt))
-                    File.WriteAllLines(txt, files.Select(Path.GetFileName));
+                    File.WriteAllLines(txt, discs.Select(d => Path.GetFileName(d.FilePath)));
 
-                // Asignar número de disco según el orden
+                for (int i = 0; i < discs.Count; i++)
+                {
+                    discs[i].GameFolder = commonFolder;
+                    discs[i].IsMultiDisc = true;
+                    if (discs[i].DiscNumber == 0) discs[i].DiscNumber = i + 1;
+                }
+            }
+
+            // 2. Fallback por nombre base para los que aún no son multidisco
+            var nameGroups = ps1Games
+                .Where(g => !g.IsMultiDisc)
+                .GroupBy(g =>
+                {
+                    string n = Path.GetFileNameWithoutExtension(g.FilePath);
+                    n = Regex.Replace(n, @"\s*\((CD|Disc|Disco)\s*\d\)", "", RegexOptions.IgnoreCase);
+                    n = Regex.Replace(n, @"\s*(CD|Disc|Disco)\s*\d", "", RegexOptions.IgnoreCase).Trim();
+                    return n;
+                }, StringComparer.OrdinalIgnoreCase)
+                .Where(grp => grp.Count() > 1);
+
+            foreach (var grp in nameGroups)
+            {
+                var files = grp.OrderBy(f => f.FilePath).ToList();
+                string baseName = grp.Key;
+                string commonFolder = Path.Combine(_paths.PopsFolder, baseName);
+                Directory.CreateDirectory(commonFolder);
+
+                string txt = Path.Combine(commonFolder, "DISCS.TXT");
+                if (!File.Exists(txt))
+                    File.WriteAllLines(txt, files.Select(f => Path.GetFileName(f.FilePath)));
+
                 for (int i = 0; i < files.Count; i++)
                 {
-                    var game = ps1Games.FirstOrDefault(g => g.FilePath.Equals(files[i], StringComparison.OrdinalIgnoreCase));
+                    var game = ps1Games.FirstOrDefault(g => g.FilePath == files[i].FilePath);
                     if (game != null)
                     {
                         game.IsMultiDisc = true;
                         game.DiscNumber = i + 1;
                         game.GameFolder = commonFolder;
-                        _log.Log($"[Multidisco] {game.Name} asignado como disco {i + 1}");
                     }
                 }
             }
