@@ -22,6 +22,9 @@ public class ConverterService
         _setStatus = setStatus;
     }
 
+    /// <summary>
+    /// Convierte todos los archivos .bin de una carpeta fuente a la carpeta de salida.
+    /// </summary>
     public async Task ConvertFolderAsync(string sourceFolder, string outputFolder)
     {
         if (!Directory.Exists(sourceFolder))
@@ -37,7 +40,9 @@ public class ConverterService
         {
             try
             {
-                await ConvertToVcdAsync(file, outputFolder);
+                string name = Path.GetFileNameWithoutExtension(file);
+                string outputPath = Path.Combine(outputFolder, name + ".VCD");
+                await ConvertPs1ToVcdAsync(file, outputPath, name);
             }
             catch (Exception ex)
             {
@@ -46,16 +51,28 @@ public class ConverterService
         }
     }
 
-    private async Task ConvertToVcdAsync(string inputPath, string outputFolder)
+    /// <summary>
+    /// Convierte un único archivo .bin a .VCD usando la ruta de salida especificada.
+    /// </summary>
+    public async Task ConvertFileAsync(string inputPath, string outputPath,
+        Action<string>? log = null, Action<string>? setStatus = null)
     {
-        string name = Path.GetFileNameWithoutExtension(inputPath);
-        // Guardar con extensión .VCD (mayúsculas)
-        string outputPath = Path.Combine(outputFolder, name + ".VCD");
+        if (!File.Exists(inputPath))
+            throw new FileNotFoundException($"Archivo no encontrado: {inputPath}");
 
-        await ConvertPs1ToVcdAsync(inputPath, outputPath, name);
+        string dir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
+
+        string name = Path.GetFileNameWithoutExtension(outputPath);
+        await ConvertPs1ToVcdAsync(inputPath, outputPath, name, log, setStatus);
     }
 
-    private async Task ConvertPs1ToVcdAsync(string inputPath, string outputPath, string name)
+    /// <summary>
+    /// Realiza la conversión real de PS1 a VCD.
+    /// </summary>
+    private async Task ConvertPs1ToVcdAsync(string inputPath, string outputPath, string name,
+        Action<string>? log = null, Action<string>? setStatus = null)
     {
         await using var input = File.OpenRead(inputPath);
         await using var output = File.Create(outputPath);
@@ -89,7 +106,7 @@ public class ConverterService
             if (processed % 200 == 0)
             {
                 int percent = (int)((processed / (double)totalSectors) * 100);
-                _setStatus?.Invoke($"Convirtiendo {name}: {percent}%");
+                (setStatus ?? _setStatus)?.Invoke($"Convirtiendo {name}: {percent}%");
             }
         }
 
