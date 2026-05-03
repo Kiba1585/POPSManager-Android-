@@ -49,8 +49,8 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand ProcessAllCommand { get; }
     public ICommand GenerateElfCommand { get; }
     public ICommand GenerateCheatsCommand { get; }
-    public ICommand DownloadCoversCommand { get; }        // NUEVO
-    public ICommand CopyMetadataCommand { get; }          // NUEVO
+    public ICommand DownloadCoversCommand { get; }
+    public ICommand CopyMetadataCommand { get; }
     public ICommand RefreshCommand { get; }
     public ICommand RenameAllCommand { get; }
     public ICommand OpenStorageSettingsCommand { get; }
