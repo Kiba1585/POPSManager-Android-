@@ -80,7 +80,7 @@ namespace POPSManager.Android.Services
             return "Error al actualizar metadatos individuales.";
         }
 
-        // ==================== COVERS ====================
+        // ==================== COVERS (CORREGIDO) ====================
 
         public async Task<string> DownloadCoversAsync(Action<string> onProgress)
         {
@@ -91,46 +91,58 @@ namespace POPSManager.Android.Services
             if (!TestWrite(artFolder)) return $"❌ Sin permisos en ART:\n{artFolder}";
 
             int downloaded = 0, skipped = 0, failed = 0;
-            string mirror = "https://archive.org/download/oplm-art-2023-11";
+            string mirrorBase = "https://archive.org/download/oplm-art-2023-11";
 
             for (int i = 0; i < all.Count; i++)
             {
                 var g = all[i];
-                string displayId = g.OriginalGameId;
-                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {displayId})");
+                string normId = g.GameId;            // sin punto (ej. SCES_00967)
+                string origId = g.OriginalGameId;    // con punto (ej. SCES_009.67)
 
-                if (string.IsNullOrWhiteSpace(displayId))
+                onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {normId})");
+
+                if (string.IsNullOrWhiteSpace(normId))
                 {
                     _log.Log($"[Cover] Sin ID: {g.Name}");
                     continue;
                 }
 
-                string art = Path.Combine(artFolder, displayId + ".jpg");
-                if (File.Exists(art) && new FileInfo(art).Length >= 1000)
+                // 1. Primero intentar con el mirror usando el ID normalizado (sin punto)
+                string artFile = Path.Combine(artFolder, normId + ".jpg");
+                if (!File.Exists(artFile) || new FileInfo(artFile).Length < 1000)
                 {
-                    skipped++;
-                    continue;
-                }
+                    bool success = false;
 
-                // Intentar primero con URL de la base de datos (si existe)
-                string? url = GameDatabase.TryGetCoverUrl(displayId);
-                if (url == null)
-                {
-                    // Fallback al mirror público con el ID original (con punto)
-                    url = $"{mirror}/ART/{displayId}.jpg";
-                }
+                    // Intentar con el mirror (ID normalizado)
+                    string url = $"{mirrorBase}/ART/{normId}.jpg";
+                    if (await DownloadFileAsync(url, artFile))
+                    {
+                        success = true;
+                    }
+                    else
+                    {
+                        // 2. Si falla, intentar con la URL de la base de datos (puede tener el ID original)
+                        string? dbUrl = GameDatabase.TryGetCoverUrl(origId);
+                        if (!string.IsNullOrWhiteSpace(dbUrl))
+                        {
+                            if (await DownloadFileAsync(dbUrl, artFile))
+                                success = true;
+                        }
+                    }
 
-                if (await DownloadFileAsync(url, art))
-                {
-                    try { ArtResizer.ResizeToArt(art, art.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
-                    catch { }
-                    downloaded++;
+                    if (success)
+                    {
+                        try { ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
+                        catch { }
+                        downloaded++;
+                    }
+                    else
+                    {
+                        _log.Log($"[Cover] No disponible para {normId} (probado también como {origId})");
+                        failed++;
+                    }
                 }
-                else
-                {
-                    _log.Log($"[Cover] No disponible para {displayId}");
-                    failed++;
-                }
+                else skipped++;
             }
 
             return $"Covers: {downloaded} desc, {skipped} existen, {failed} no encontrados.";
@@ -154,7 +166,7 @@ namespace POPSManager.Android.Services
             for (int i = 0; i < all.Count; i++)
             {
                 var g = all[i];
-                string searchId = g.GameId; // ID normalizado (sin punto)
+                string searchId = g.GameId;
                 onProgress($"{i + 1}/{all.Count}: {g.Name} (ID: {searchId})");
 
                 if (string.IsNullOrWhiteSpace(searchId))
@@ -166,7 +178,6 @@ namespace POPSManager.Android.Services
                 string dest = Path.Combine(cfgFolder, searchId + ".cfg");
                 if (!File.Exists(dest))
                 {
-                    // PRIMERO intentar con el ID normalizado (sin punto), DESPUÉS con el original
                     string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, searchId)
                                       ?? TryCopyCfg(sourceCfg, cfgFolder, g.OriginalGameId);
                     if (copiedFile != null)
