@@ -26,6 +26,13 @@ public class ProcessPopsViewModel : BindableObject
     public bool CheatFixSound { get => _cheatFixSound; set => SetProperty(ref _cheatFixSound, value); }
     public bool CheatFixGraphics { get => _cheatFixGraphics; set => SetProperty(ref _cheatFixGraphics, value); }
 
+    private bool _isUpdateModeIndividual = true;
+    public bool IsUpdateModeIndividual
+    {
+        get => _isUpdateModeIndividual;
+        set => SetProperty(ref _isUpdateModeIndividual, value);
+    }
+
     private string _oplRootFolder = "";
     public string OplRootFolder
     {
@@ -89,7 +96,7 @@ public class ProcessPopsViewModel : BindableObject
         {
             OplRootFolder = savedRoot;
             Status = _listService.Refresh();
-            GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
+            GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
         }
         else Status = "Selecciona la carpeta raíz OPL.";
     }
@@ -104,12 +111,17 @@ public class ProcessPopsViewModel : BindableObject
             await _settings.SaveAsync();
             OplRootFolder = path;
             Status = _listService.Refresh();
-            GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
+            GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
         }
     }
 
-    private async Task UpdateDatabase() =>
-        Status = await _assetService.UpdateDatabaseAsync(ReportProgress);
+    private async Task UpdateDatabase()
+    {
+        if (IsUpdateModeIndividual)
+            Status = await _assetService.UpdateIndividualAsync(ReportProgress);
+        else
+            Status = await _assetService.CheckAndUpdateFullAsync(ReportProgress);
+    }
 
     private async Task DownloadCovers() =>
         Status = await _assetService.DownloadCoversAsync(ReportProgress);
