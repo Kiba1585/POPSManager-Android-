@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using POPSManager.Core.Logic;
 using POPSManager.Core.Services;
 using POPSManager.Android.Services;
 
@@ -78,12 +79,12 @@ public class ConvertViewModel : BindableObject
         var savedDest = _settings.DestinationFolder;
         if (!string.IsNullOrEmpty(savedDest) && savedDest != _destFolder)
         {
-            _destFolder = savedDest.Trim();   // sanitizar espacios
+            _destFolder = savedDest;
             OnPropertyChanged(nameof(DestFolder));
 
             if (_paths is PathsServiceAndroid androidPaths)
             {
-                androidPaths.RootFolder = _destFolder;
+                androidPaths.RootFolder = savedDest;
                 androidPaths.EnsureOplFoldersExist();
             }
         }
@@ -94,9 +95,9 @@ public class ConvertViewModel : BindableObject
         var path = await _paths.SelectFolderAsync();
         if (path != null)
         {
-            _settings.SourceFolder = path.Trim();
+            _settings.SourceFolder = path;
             await _settings.SaveAsync();
-            SourceFolder = path.Trim();
+            SourceFolder = path;
         }
     }
 
@@ -105,15 +106,14 @@ public class ConvertViewModel : BindableObject
         var path = await _paths.SelectFolderAsync();
         if (path != null)
         {
-            string cleanPath = path.Trim();
-            _settings.DestinationFolder = cleanPath;
-            _settings.RootFolder = cleanPath;
+            _settings.DestinationFolder = path;
+            _settings.RootFolder = path;
             await _settings.SaveAsync();
-            DestFolder = cleanPath;
+            DestFolder = path;
 
             if (_paths is PathsServiceAndroid androidPaths)
             {
-                androidPaths.RootFolder = cleanPath;
+                androidPaths.RootFolder = path;
                 androidPaths.EnsureOplFoldersExist();
             }
         }
@@ -160,32 +160,70 @@ public class ConvertViewModel : BindableObject
         }
 
         string outputFolder = _paths.PopsFolder;
-
-        // Verificar permisos de escritura en la carpeta POPS
-        if (!TestWrite(outputFolder))
-        {
-            Status = $"❌ Sin permisos de escritura en:\n{outputFolder}\n" +
-                     "Ve a Ajustes > Aplicaciones > POPSManager > Acceso a todos los archivos y actívalo.";
-            return;
-        }
+        try { Directory.CreateDirectory(outputFolder); }
+        catch (Exception ex) { Status = $"Error al crear carpeta de salida: {ex.Message}"; return; }
 
         var progressConverter = new ConverterService(
             log: msg => _log.Log(msg),
-            setStatus: msg => MainThread.BeginInvokeOnMainThread(() => Status = msg)
-        );
+            setStatus: msg => MainThread.BeginInvokeOnMainThread(() => Status = msg));
 
         _actualOutputFolder = outputFolder;
-
         Status = "Convirtiendo...";
+
+        int converted = 0;
+        var binFiles = Directory.GetFiles(SourceFolder, "*.bin", SearchOption.TopDirectoryOnly);
+
+        foreach (var file in binFiles)
+        {
+            try
+            {
+                // Extraer Game ID del contenido del archivo .bin
+                string gameId = ExtractGameId(file);
+                if (string.IsNullOrWhiteSpace(gameId))
+                {
+                    _log.Log($"[Convertir] No se pudo extraer Game ID de {Path.GetFileName(file)}");
+                    continue;
+                }
+
+                // Nombre limpio para el juego (sin ID, usando el nombre del archivo original)
+                string rawName = Path.GetFileNameWithoutExtension(file);
+                string cleanName = GameListService.OplCompatibleTitle(rawName, 1, false);
+
+                // Construir nombre de salida: GAMEID.Nombre_Limpio.VCD
+                string outputFileName = $"{gameId}.{cleanName}.VCD";
+                string outputPath = Path.Combine(outputFolder, outputFileName);
+
+                // Convertir el archivo
+                await progressConverter.ConvertFileAsync(
+                    file,
+                    outputPath,
+                    msg => _log.Log(msg),
+                    msg => MainThread.BeginInvokeOnMainThread(() => Status = msg));
+
+                converted++;
+            }
+            catch (Exception ex)
+            {
+                _log.Log($"ERROR convirtiendo {Path.GetFileName(file)}: {ex.Message}");
+            }
+        }
+
+        Status = converted > 0
+            ? $"{converted} archivos convertidos en: {outputFolder}"
+            : "No se encontraron archivos .bin para convertir.";
+    }
+
+    /// <summary> Extrae el Game ID del archivo (usa el contenido, no solo el nombre). </summary>
+    private string ExtractGameId(string filePath)
+    {
         try
         {
-            await progressConverter.ConvertFolderAsync(SourceFolder, outputFolder);
-            Status = $"Conversión completada. Archivos en: {outputFolder}";
+            var id = GameIdDetector.DetectGameId(filePath);
+            if (!string.IsNullOrWhiteSpace(id)) return id;
         }
-        catch (Exception ex)
-        {
-            Status = $"Error: {ex.Message}";
-        }
+        catch { }
+        // Fallback: extraer del nombre del archivo
+        return GameIdDetector.DetectFromName(Path.GetFileNameWithoutExtension(filePath));
     }
 
     private void OpenOutputFolder()
@@ -200,18 +238,5 @@ public class ConvertViewModel : BindableObject
     {
         try { await action(); }
         catch (Exception ex) { Status = $"Error: {ex.Message}"; }
-    }
-
-    private bool TestWrite(string folder)
-    {
-        try
-        {
-            Directory.CreateDirectory(folder);
-            string testFile = Path.Combine(folder, ".writetest");
-            File.WriteAllText(testFile, "test");
-            File.Delete(testFile);
-            return true;
-        }
-        catch { return false; }
     }
 }
