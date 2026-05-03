@@ -4,9 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using POPSManager.Core.Logic;
-using POPSManager.Core.Models;      // Core.Models.GameEntry
 using POPSManager.Core.Services;
-using POPSManager.Android.Models;   // nuestro GameItem
+using POPSManager.Android.Models;
 
 namespace POPSManager.Android.Services
 {
@@ -77,7 +76,7 @@ namespace POPSManager.Android.Services
 
         private GameItem BuildItem(string filePath, string parentFolder)
         {
-            // 1. Extraer GameID del archivo
+            // 1. Extraer GameID
             string orig = ExtractGameId(filePath);
             string norm = NormalizeGameId(orig);
 
@@ -122,15 +121,15 @@ namespace POPSManager.Android.Services
                 if (discFound) multiDisc = true;
             }
 
-            // 4. Determinar título final
+            // 4. Determinar título final (sin abreviar)
             string title;
             if (!string.IsNullOrWhiteSpace(titleFromDb))
             {
-                title = GameListService.OplCompatibleTitle(titleFromDb, discNumber, multiDisc);
+                title = OplCompatibleTitle(titleFromDb, discNumber, multiDisc);
             }
             else
             {
-                title = GameListService.OplCompatibleTitle(fname, discNumber, multiDisc);
+                title = OplCompatibleTitle(fname, discNumber, multiDisc);
             }
 
             string comp = Path.Combine(parentFolder, fname);
@@ -150,7 +149,7 @@ namespace POPSManager.Android.Services
             };
         }
 
-        // ========== Utilidades de nombre ==========
+        // ========== Utilidades de nombre (SIN ABREVIACIÓN) ==========
         public static string OplCompatibleTitle(string raw, int discNum, bool multi)
         {
             string t = raw;
@@ -168,27 +167,22 @@ namespace POPSManager.Android.Services
                     t = t.Substring(dot + 1).Trim();
             }
 
+            // Eliminar paréntesis (excepto los de disco)
             t = Regex.Replace(t, @"\s*\((?!CD\d)[^)]*\)\s*", " ", RegexOptions.IgnoreCase);
+
+            // Limpiar caracteres extraños
             t = t.Replace("'", "").Replace(":", "").Replace("[", "").Replace("]", "")
                  .Replace(",,", ",").Replace(",,", ",").Replace(",", "");
             t = Regex.Replace(t, @"[\s_]+", "_").Trim('_');
 
+            // Añadir número de disco si es multidisco
             if (multi && discNum > 1) t += $" (CD{discNum})";
-            return AbbreviateIfTooLong(t, 32);
+
+            // Se elimina la llamada a AbbreviateIfTooLong – ya no se recorta el nombre
+            return t;
         }
 
-        public static string AbbreviateIfTooLong(string title, int max = 32)
-        {
-            if (title.Length <= max) return title;
-            int dash = title.IndexOf(" - ");
-            string baseP = dash > 0 ? title.Substring(0, dash).Trim() : title;
-            string subP = dash > 0 ? title.Substring(dash + 3).Trim() : "";
-            var words = baseP.Split('_', StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length <= 1) return title;
-            string abbr = string.Concat(words.Select(w => char.ToUpper(w[0])));
-            string res = string.IsNullOrEmpty(subP) ? abbr : $"{abbr} - {subP}";
-            return res.Length <= max ? res : res.Substring(0, max).Trim();
-        }
+        // El método AbbreviateIfTooLong puede permanecer por si se necesita en el futuro
 
         private static string NormalizeGameId(string raw)
         {
