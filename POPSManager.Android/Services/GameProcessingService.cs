@@ -95,8 +95,120 @@ namespace POPSManager.Android.Services
             return msg;
         }
 
-        // ... (GenerateAllElfsAsync, GenerateAllCheatsAsync, ProcessMultidiscAsync se mantienen igual que antes)
+        // ==================== GENERAR ELFs ====================
+        public async Task<string> GenerateAllElfsAsync()
+        {
+            string baseElf = _paths.PopstarterElfPath;
+            string rootElf = Path.Combine(_paths.RootFolder, "POPSTARTER.ELF");
+            string popsElf = Path.Combine(_paths.PopsFolder, "POPSTARTER.ELF");
+            bool existsRoot = File.Exists(rootElf);
+            bool existsPops = File.Exists(popsElf);
+            if (!existsRoot && !existsPops)
+                return $"POPSTARTER.ELF no encontrado.\nRaíz: {rootElf}\nPOPS: {popsElf}";
 
+            string elfToUse = existsPops ? popsElf : rootElf;
+            await ProcessMultidiscAsync();
+
+            int generated = 0, skipped = 0;
+            foreach (var g in _listService.Ps1Games)
+            {
+                if (!File.Exists(g.FilePath)) { _log.Log($"[ELF] No VCD: {g.FilePath}"); continue; }
+                string elfName = $"{Path.GetFileNameWithoutExtension(g.FilePath)}.ELF";
+                string elfPath = g.IsMultiDisc ? Path.Combine(g.GameFolder, elfName)
+                    : Path.Combine(Path.Combine(_paths.AppsFolder, g.Name), elfName);
+                if (!g.IsMultiDisc) Directory.CreateDirectory(Path.GetDirectoryName(elfPath)!);
+
+                if (!File.Exists(elfPath))
+                {
+                    ElfGenerator.GeneratePs1Elf(elfToUse, g.FilePath, elfPath, g.DiscNumber, g.Name, g.OriginalGameId, msg => _log.Log(msg));
+                    generated++;
+                }
+                else { _log.Log($"[ELF] Ya existe: {elfName}"); skipped++; }
+
+                if (!g.IsMultiDisc)
+                {
+                    string cfg = Path.Combine(Path.GetDirectoryName(elfPath)!, "title.cfg");
+                    if (!File.Exists(cfg))
+                    {
+                        try { File.WriteAllText(cfg, $"title={g.Name}\nboot={elfName}\n"); }
+                        catch (Exception ex) { _log.Log($"[ELF] Error title.cfg: {ex.Message}"); }
+                    }
+                }
+            }
+
+            return generated > 0 ? $"{generated} ELFs generados. {skipped} ya existían." : $"No se generaron ELFs. {skipped} ya existían.";
+        }
+
+        // ==================== GENERAR CHEATS ====================
+        public async Task<string> GenerateAllCheatsAsync(bool widescreen, bool nopal, bool fixSound, bool fixGraphics)
+        {
+            var extra = new List<string>();
+            if (widescreen) extra.Add("WIDESCREEN=ON");
+            if (nopal) extra.Add("$NOPAL");
+            if (fixSound) extra.Add("FIXSOUND=ON");
+            if (fixGraphics) extra.Add("FIXGRAPHICS=ON");
+
+            int gen = 0, skip = 0;
+            foreach (var g in _listService.Ps1Games)
+            {
+                Directory.CreateDirectory(g.GameFolder);
+                string cheat = Path.Combine(g.GameFolder, "CHEAT.TXT");
+                if (!File.Exists(cheat))
+                {
+                    CheatGenerator.GenerateCheatTxt(g.OriginalGameId, g.GameFolder, extra, msg => _log.Log(msg));
+                    gen++;
+                }
+                else { _log.Log($"[Cheats] Ya existe: {cheat}"); skip++; }
+            }
+            return gen > 0 ? $"{gen} CHEAT.TXT generados. {skip} ya existían." : $"No se generaron cheats. {skip} ya existían.";
+        }
+
+        // ==================== PROCESAR MULTIDISCO ====================
+        private async Task ProcessMultidiscAsync()
+        {
+            var groups = _listService.Ps1Games.Where(g => !string.IsNullOrEmpty(g.GameId))
+                .GroupBy(g => new string(g.GameId.TakeWhile(c => c != '.' && c != '_').ToArray())).ToList();
+
+            foreach (var grp in groups)
+            {
+                var discs = grp.OrderBy(d => d.DiscNumber).ToList();
+                if (discs.Count <= 1) continue;
+
+                string baseName = discs.First().Name;
+                baseName = Regex.Replace(baseName, @"\s*\(CD\d\)", "").Trim();
+                string common = Path.Combine(Path.GetDirectoryName(discs.First().FilePath)!, baseName);
+                Directory.CreateDirectory(common);
+
+                string txt = Path.Combine(common, "DISCS.TXT");
+                if (!File.Exists(txt))
+                {
+                    var fileNames = discs.Select(d => Path.GetFileName(d.FilePath)).Where(f => f != null).Cast<string>().ToList();
+                    await File.WriteAllLinesAsync(txt, fileNames);
+                    _log.Log($"[Multidisco] Creado {txt}");
+                }
+
+                string baseElf = _paths.PopstarterElfPath;
+                if (File.Exists(baseElf))
+                {
+                    foreach (var d in discs)
+                    {
+                        d.GameFolder = common;
+                        string ef = Path.Combine(common, $"{Path.GetFileNameWithoutExtension(d.FilePath)}.ELF");
+                        if (!File.Exists(ef))
+                            ElfGenerator.GeneratePs1Elf(baseElf, d.FilePath, ef, d.DiscNumber, d.Name, d.OriginalGameId, msg => _log.Log(msg));
+                    }
+                }
+
+                string tcfg = Path.Combine(common, "title.cfg");
+                if (!File.Exists(tcfg))
+                {
+                    string efn = $"{Path.GetFileNameWithoutExtension(discs.First().FilePath)}.ELF";
+                    await File.WriteAllTextAsync(tcfg, $"title={baseName}\nboot={efn}\n");
+                }
+            }
+        }
+
+        // ==================== CREAR ESTRUCTURA MULTIDISCO ====================
         private void CreateMultidiscStructure(ObservableCollection<GameItem> ps1Games)
         {
             // 1. Agrupar por Game ID normalizado
