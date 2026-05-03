@@ -24,9 +24,6 @@ namespace POPSManager.Android.Services
             _listService = listService;
         }
 
-        /// <summary>
-        /// Actualiza la base de datos interna, mostrando progreso mediante <paramref name="onProgress"/>.
-        /// </summary>
         public async Task<string> UpdateDatabaseAsync(Action<string> onProgress)
         {
             var ids = _listService.Ps1Games.Select(g => g.OriginalGameId)
@@ -42,32 +39,16 @@ namespace POPSManager.Android.Services
             return "Error al actualizar la base de datos.";
         }
 
-        /// <summary>
-        /// Descarga covers y copia metadatos, mostrando progreso mediante <paramref name="onProgress"/>.
-        /// </summary>
-        public async Task<string> DownloadCoversAndMetadataAsync(Action<string> onProgress)
+        /// <summary> Descarga las carátulas (covers) de los juegos listados. </summary>
+        public async Task<string> DownloadCoversAsync(Action<string> onProgress)
         {
             var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
             if (!all.Any()) return "No hay juegos.";
 
             string artFolder = _paths.ArtFolder;
-            string cfgFolder = _paths.CfgFolder;
-            bool canWriteArt = TestWrite(artFolder);
-            bool canWriteCfg = TestWrite(cfgFolder);
-            if (!canWriteArt && !canWriteCfg) return "❌ Sin permisos en ART ni CFG.";
+            if (!TestWrite(artFolder)) return $"❌ Sin permisos de escritura en ART:\n{artFolder}";
 
-            string sourceCfg = Path.Combine(InternalDatabaseFolder, "CFG");
-            bool canMetadata = Directory.Exists(sourceCfg);
-            int cacheCount = 0;
-            string cacheSample = "";
-            if (canMetadata)
-            {
-                var files = Directory.GetFiles(sourceCfg, "*.cfg");
-                cacheCount = files.Length;
-                cacheSample = files.FirstOrDefault() ?? "";
-            }
-
-            int coversDl = 0, coversSkip = 0, metaCopy = 0, metaSkip = 0;
+            int downloaded = 0, skipped = 0;
             string mirror = "https://archive.org/download/oplm-art-2023-11";
 
             for (int i = 0; i < all.Count; i++)
@@ -77,48 +58,73 @@ namespace POPSManager.Android.Services
 
                 if (string.IsNullOrWhiteSpace(g.OriginalGameId))
                 {
-                    _log.Log($"[SKIP] Sin ID: {g.Name}");
+                    _log.Log($"[Cover] Sin ID: {g.Name}");
                     continue;
                 }
 
-                // Cover
-                if (canWriteArt)
+                string art = Path.Combine(artFolder, g.OriginalGameId + ".jpg");
+                if (!File.Exists(art) || new FileInfo(art).Length < 1000)
                 {
-                    string art = Path.Combine(artFolder, g.OriginalGameId + ".jpg");
-                    if (!File.Exists(art) || new FileInfo(art).Length < 1000)
+                    string url = GameDatabase.TryGetCoverUrl(g.OriginalGameId)
+                                 ?? $"{mirror}/ART/{g.OriginalGameId}.jpg";
+                    if (await DownloadFileAsync(url, art))
                     {
-                        string url = GameDatabase.TryGetCoverUrl(g.OriginalGameId) ?? $"{mirror}/ART/{g.OriginalGameId}.jpg";
-                        if (await DownloadFileAsync(url, art))
-                        {
-                            try { ArtResizer.ResizeToArt(art, art.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
-                            catch { }
-                            coversDl++;
-                        }
-                        else _log.Log($"[Cover] Falló {url}");
+                        try { ArtResizer.ResizeToArt(art, art.Replace(".jpg", ".ART"), msg => _log.Log(msg)); }
+                        catch { }
+                        downloaded++;
                     }
-                    else coversSkip++;
+                    else _log.Log($"[Cover] Falló {url}");
                 }
-
-                // Metadata
-                if (canWriteCfg && canMetadata)
-                {
-                    string dest = Path.Combine(cfgFolder, g.OriginalGameId + ".cfg");
-                    if (!File.Exists(dest))
-                    {
-                        string? copied = TryCopyCfg(sourceCfg, cfgFolder, g.OriginalGameId)
-                                     ?? TryCopyCfg(sourceCfg, cfgFolder, g.GameId);
-                        if (copied != null) metaCopy++;
-                        else _log.Log($"[Meta] No encontrado: {g.OriginalGameId}");
-                    }
-                    else metaSkip++;
-                }
+                else skipped++;
             }
 
-            string msg = $"Covers: {coversDl} desc, {coversSkip} ya existían.\n";
-            if (canMetadata) msg += $"Metadatos: {metaCopy} copiados, {metaSkip} ya existían.\n";
-            else msg += "Metadatos: BD interna no disponible.\n";
-            msg += $"Caché: {cacheCount} CFGs. Ej: {Path.GetFileName(cacheSample)}";
-            return msg;
+            return $"Covers: {downloaded} descargados, {skipped} ya existían.";
+        }
+
+        /// <summary> Copia los metadatos (.cfg) desde la caché interna a la carpeta CFG del destino. </summary>
+        public async Task<string> CopyMetadataAsync(Action<string> onProgress)
+        {
+            var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
+            if (!all.Any()) return "No hay juegos.";
+
+            string cfgFolder = _paths.CfgFolder;
+            if (!TestWrite(cfgFolder)) return $"❌ Sin permisos de escritura en CFG:\n{cfgFolder}";
+
+            string sourceCfg = Path.Combine(InternalDatabaseFolder, "CFG");
+            if (!Directory.Exists(sourceCfg))
+                return "La caché interna no existe. Usa 'Actualizar DB' primero.";
+
+            int copied = 0, skipped = 0, notFound = 0;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var g = all[i];
+                onProgress($"{i + 1}/{all.Count}: {g.Name}");
+
+                if (string.IsNullOrWhiteSpace(g.OriginalGameId))
+                {
+                    _log.Log($"[Meta] Sin ID: {g.Name}");
+                    continue;
+                }
+
+                string dest = Path.Combine(cfgFolder, g.OriginalGameId + ".cfg");
+                if (!File.Exists(dest))
+                {
+                    string? copiedFile = TryCopyCfg(sourceCfg, cfgFolder, g.OriginalGameId)
+                                      ?? TryCopyCfg(sourceCfg, cfgFolder, g.GameId);
+                    if (copiedFile != null)
+                    {
+                        copied++;
+                    }
+                    else
+                    {
+                        _log.Log($"[Meta] No encontrado: {g.OriginalGameId}");
+                        notFound++;
+                    }
+                }
+                else skipped++;
+            }
+
+            return $"Metadatos: {copied} copiados, {skipped} ya existían, {notFound} no encontrados.";
         }
 
         private static string? TryCopyCfg(string srcDir, string destDir, string id)
