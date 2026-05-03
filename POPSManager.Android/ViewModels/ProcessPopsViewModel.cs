@@ -96,7 +96,7 @@ public class ProcessPopsViewModel : BindableObject
         {
             OplRootFolder = savedRoot;
             Status = _listService.Refresh();
-            GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
+            GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
         }
         else Status = "Selecciona la carpeta raíz OPL.";
     }
@@ -111,7 +111,7 @@ public class ProcessPopsViewModel : BindableObject
             await _settings.SaveAsync();
             OplRootFolder = path;
             Status = _listService.Refresh();
-            GameDatabase.Initialize(DatabaseUpdaterService.InternalDatabaseFolder);
+            GameDatabase.Initialize(DatabaseUpdater.InternalDatabaseFolder);
         }
     }
 
