@@ -151,14 +151,27 @@ namespace POPSManager.Android.Services
             int gen = 0, skip = 0;
             foreach (var g in _listService.Ps1Games)
             {
-                Directory.CreateDirectory(g.GameFolder);
-                string cheat = Path.Combine(g.GameFolder, "CHEAT.TXT");
-                if (!File.Exists(cheat))
+                try
                 {
-                    CheatGenerator.GenerateCheatTxt(g.OriginalGameId, g.GameFolder, extra, msg => _log.Log(msg));
-                    gen++;
+                    // Asegurar que la carpeta existe antes de escribir
+                    Directory.CreateDirectory(g.GameFolder);
+                    string cheat = Path.Combine(g.GameFolder, "CHEAT.TXT");
+                    if (!File.Exists(cheat))
+                    {
+                        CheatGenerator.GenerateCheatTxt(g.OriginalGameId, g.GameFolder, extra, msg => _log.Log(msg));
+                        gen++;
+                        _log.Log($"[Cheats] Generado en {cheat}");
+                    }
+                    else
+                    {
+                        _log.Log($"[Cheats] Ya existe: {cheat}");
+                        skip++;
+                    }
                 }
-                else { _log.Log($"[Cheats] Ya existe: {cheat}"); skip++; }
+                catch (Exception ex)
+                {
+                    _log.Log($"[Cheats][ERROR] {ex.Message}");
+                }
             }
             return gen > 0 ? $"{gen} CHEAT.TXT generados. {skip} ya existían." : $"No se generaron cheats. {skip} ya existían.";
         }
