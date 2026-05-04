@@ -18,16 +18,16 @@ namespace POPSManager.Android.Services
         private readonly GameListService _listService;
         private readonly DatabaseUpdaterService _dbUpdater;
 
-        // 🔥 CACHE EN MEMORIA
+        // Índice en memoria de CFG
         private Dictionary<string, string> _cfgIndex = new(StringComparer.OrdinalIgnoreCase);
         private bool _indexBuilt = false;
 
-        // 🔥 MIRRORS DE COVERS (orden de prioridad)
+        // Mirrors de covers (orden de prioridad)
         private static readonly string[] CoverMirrors = new[]
         {
             "https://raw.githubusercontent.com/Luden02/oplm-art/main/ART",
             "https://raw.githubusercontent.com/xlenore/psx-covers/main/covers",
-            "https://archive.org/download/oplm-art-2023-11/ART"  // fallback
+            "https://archive.org/download/oplm-art-2023-11/ART"
         };
 
         public GameAssetService(IPathsService paths, ILoggingService log,
@@ -39,22 +39,25 @@ namespace POPSManager.Android.Services
             _dbUpdater = dbUpdater;
         }
 
-        // ==================== INDEX CFG ====================
-
+        // ==================== ÍNDICE DE CFG (forzado) ====================
         private void BuildCfgIndex()
         {
             if (_indexBuilt) return;
 
             string sourceCfg = Path.Combine(InternalDatabaseFolder, "CFG");
             _log.Log($"[CFG] Construyendo índice desde: {sourceCfg}");
+            _log.Log($"[CFG] ¿Existe la carpeta?: {Directory.Exists(sourceCfg)}");
 
             if (!Directory.Exists(sourceCfg))
             {
-                _log.Log("[CFG] ERROR: carpeta no existe");
+                _log.Log("[CFG] ERROR: la carpeta CFG no existe en la caché interna. Ejecuta 'Actualizar DB' primero.");
                 return;
             }
 
             var files = Directory.GetFiles(sourceCfg, "*.cfg");
+            _log.Log($"[CFG] Archivos encontrados: {files.Length}");
+
+            _cfgIndex.Clear();
             foreach (var file in files)
             {
                 string name = Path.GetFileNameWithoutExtension(file).Trim();
@@ -80,8 +83,176 @@ namespace POPSManager.Android.Services
                 .ToUpperInvariant() ?? "";
         }
 
-        // ==================== MODOS DE ACTUALIZACIÓN ====================
+        // ==================== METADATOS ====================
+        public async Task<string> CopyMetadataAsync(Action<string> onProgress)
+        {
+            var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
+            if (!all.Any()) return "No hay juegos.";
 
+            string cfgFolder = _paths.CfgFolder;
+            if (!TestWrite(cfgFolder)) return $"❌ Sin permisos en CFG:\n{cfgFolder}";
+
+            BuildCfgIndex();
+
+            if (_cfgIndex.Count == 0)
+                return "El índice de CFG está vacío. Ejecuta 'Actualizar DB' primero.";
+
+            int copied = 0, skipped = 0, notFound = 0;
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                var g = all[i];
+                string origId = g.OriginalGameId?.Trim() ?? "";
+                string normId = Normalize(g.GameId);
+
+                onProgress($"{i + 1}/{all.Count}: {g.Name} ({origId})");
+
+                if (string.IsNullOrWhiteSpace(origId))
+                {
+                    _log.Log($"[Meta] Sin ID: {g.Name}");
+                    continue;
+                }
+
+                string dest = Path.Combine(cfgFolder, origId + ".cfg");
+                if (File.Exists(dest))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                string? foundFile = null;
+                if (_cfgIndex.TryGetValue(origId, out foundFile) ||
+                    _cfgIndex.TryGetValue(normId, out foundFile))
+                {
+                    try
+                    {
+                        File.Copy(foundFile, dest, true);
+                        copied++;
+                        _log.Log($"[Meta] Copiado: {origId}.cfg a {dest}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Log($"[Meta][ERROR] {ex.Message} al copiar {origId}.cfg");
+                    }
+                }
+                else
+                {
+                    _log.Log($"[Meta] NO ENCONTRADO en índice: {origId} ni {normId}");
+                    notFound++;
+                }
+            }
+
+            return $"Metadatos: {copied} copiados, {skipped} existían, {notFound} no encontrados.";
+        }
+
+        // ==================== COVERS ====================
+        public async Task<string> DownloadCoversAsync(Action<string> onProgress)
+        {
+            var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
+            if (!all.Any()) return "No hay juegos.";
+
+            string artFolder = _paths.ArtFolder;
+            if (!TestWrite(artFolder)) return $"❌ Sin permisos en ART:\n{artFolder}";
+
+            int downloaded = 0, skipped = 0, failed = 0;
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                var g = all[i];
+                string origId = g.OriginalGameId?.Trim();
+                string normId = Normalize(g.GameId);
+
+                onProgress($"{i + 1}/{all.Count}: {g.Name}");
+
+                if (string.IsNullOrWhiteSpace(origId))
+                    continue;
+
+                string artFile = Path.Combine(artFolder, origId + ".jpg");
+                if (File.Exists(artFile) && new FileInfo(artFile).Length > 1000)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                bool success = false;
+                foreach (var mirrorBase in CoverMirrors)
+                {
+                    if (await TryDownloadWithRetry(client, $"{mirrorBase}/{normId}.jpg", artFile) ||
+                        await TryDownloadWithRetry(client, $"{mirrorBase}/{origId}.jpg", artFile))
+                    {
+                        success = true;
+                        break;
+                    }
+                }
+
+                if (!success)
+                {
+                    string? dbUrl = GameDatabase.TryGetCoverUrl(origId);
+                    if (!string.IsNullOrWhiteSpace(dbUrl))
+                        success = await TryDownloadWithRetry(client, dbUrl, artFile);
+                }
+
+                if (success)
+                {
+                    try
+                    {
+                        ArtResizer.ResizeToArt(artFile, artFile.Replace(".jpg", ".ART"), msg => _log.Log(msg));
+                    }
+                    catch { }
+                    downloaded++;
+                }
+                else
+                {
+                    _log.Log($"[Cover] FALLÓ para {origId} (norm: {normId}) tras probar todos los mirrors");
+                    failed++;
+                }
+            }
+
+            return $"Covers: {downloaded} desc, {skipped} existen, {failed} no encontrados.";
+        }
+
+        private async Task<bool> TryDownloadWithRetry(HttpClient client, string url, string dest, int maxRetries = 2)
+        {
+            for (int retry = 0; retry <= maxRetries; retry++)
+            {
+                try
+                {
+                    var res = await client.GetAsync(url);
+                    if (res.IsSuccessStatusCode)
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                        await using var fs = new FileStream(dest, FileMode.Create);
+                        await res.Content.CopyToAsync(fs);
+                        _log.Log($"[Cover] OK: {url}");
+                        return true;
+                    }
+                    _log.Log($"[Cover] HTTP {(int)res.StatusCode} para {url}");
+                }
+                catch (Exception ex)
+                {
+                    _log.Log($"[Cover] Reintento {retry + 1}: {ex.Message}");
+                }
+                if (retry < maxRetries) await Task.Delay(1000);
+            }
+            return false;
+        }
+
+        // ==================== DIAGNÓSTICO ====================
+        public string GetDebugIds()
+        {
+            BuildCfgIndex();
+
+            var games = _listService.Ps1Games
+                .Take(5)
+                .Select(g => $"{g.Name} -> {g.OriginalGameId}");
+
+            var files = _cfgIndex.Keys.Take(5);
+
+            return $"🎮 Juegos:\n{string.Join("\n", games)}\n\n📄 CFGs en caché:\n{string.Join("\n", files)}";
+        }
+
+        // ==================== MODOS DE ACTUALIZACIÓN ====================
         public async Task<string> CheckAndUpdateFullAsync(Action<string> onProgress)
         {
             var (newAvailable, tag) = await _dbUpdater.CheckForUpdateAsync();
@@ -137,185 +308,7 @@ namespace POPSManager.Android.Services
             return "Error al actualizar metadatos individuales.";
         }
 
-        // ==================== METADATOS ====================
-
-        public async Task<string> CopyMetadataAsync(Action<string> onProgress)
-        {
-            var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
-            if (!all.Any()) return "No hay juegos.";
-
-            string cfgFolder = _paths.CfgFolder;
-            if (!TestWrite(cfgFolder)) return $"❌ Sin permisos en CFG:\n{cfgFolder}";
-
-            BuildCfgIndex();
-
-            int copied = 0, skipped = 0, notFound = 0;
-
-            for (int i = 0; i < all.Count; i++)
-            {
-                var g = all[i];
-                string origId = g.OriginalGameId?.Trim() ?? "";
-                string normId = Normalize(g.GameId);
-
-                onProgress($"{i + 1}/{all.Count}: {g.Name} ({origId})");
-
-                if (string.IsNullOrWhiteSpace(origId))
-                {
-                    _log.Log($"[Meta] Sin ID: {g.Name}");
-                    continue;
-                }
-
-                string dest = Path.Combine(cfgFolder, origId + ".cfg");
-                if (File.Exists(dest))
-                {
-                    skipped++;
-                    continue;
-                }
-
-                if (_cfgIndex.TryGetValue(origId, out var file) ||
-                    _cfgIndex.TryGetValue(normId, out file))
-                {
-                    try
-                    {
-                        File.Copy(file, dest, true);
-                        copied++;
-                        _log.Log($"[Meta] OK: {origId}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.Log($"[Meta][ERROR] {ex.Message}");
-                    }
-                }
-                else
-                {
-                    _log.Log($"[Meta] NO ENCONTRADO: {origId} / {normId}");
-                    notFound++;
-                }
-            }
-
-            return $"Metadatos: {copied} copiados, {skipped} existían, {notFound} no encontrados.";
-        }
-
-        // ==================== COVERS (CON MIRRORS ALTERNATIVOS) ====================
-
-        public async Task<string> DownloadCoversAsync(Action<string> onProgress)
-        {
-            var all = _listService.Ps1Games.Concat(_listService.Ps2Games).ToList();
-            if (!all.Any()) return "No hay juegos.";
-
-            string artFolder = _paths.ArtFolder;
-            if (!TestWrite(artFolder)) return $"❌ Sin permisos en ART:\n{artFolder}";
-
-            int downloaded = 0, skipped = 0, failed = 0;
-
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-
-            for (int i = 0; i < all.Count; i++)
-            {
-                var g = all[i];
-                string origId = g.OriginalGameId?.Trim();
-                string normId = Normalize(g.GameId);
-
-                onProgress($"{i + 1}/{all.Count}: {g.Name}");
-
-                if (string.IsNullOrWhiteSpace(origId))
-                    continue;
-
-                string artFile = Path.Combine(artFolder, origId + ".jpg");
-                if (File.Exists(artFile) && new FileInfo(artFile).Length > 1000)
-                {
-                    skipped++;
-                    continue;
-                }
-
-                bool success = false;
-
-                // Probar cada mirror con normId y origId
-                foreach (var mirrorBase in CoverMirrors)
-                {
-                    if (await TryDownloadWithRetry(client, $"{mirrorBase}/{normId}.jpg", artFile) ||
-                        await TryDownloadWithRetry(client, $"{mirrorBase}/{origId}.jpg", artFile))
-                    {
-                        success = true;
-                        break;
-                    }
-                }
-
-                // Si ningún mirror funcionó, probar base de datos local
-                if (!success)
-                {
-                    string? dbUrl = GameDatabase.TryGetCoverUrl(origId);
-                    if (!string.IsNullOrWhiteSpace(dbUrl))
-                        success = await TryDownloadWithRetry(client, dbUrl, artFile);
-                }
-
-                if (success)
-                {
-                    try
-                    {
-                        ArtResizer.ResizeToArt(
-                            artFile,
-                            artFile.Replace(".jpg", ".ART"),
-                            msg => _log.Log(msg));
-                    }
-                    catch { }
-
-                    downloaded++;
-                }
-                else
-                {
-                    _log.Log($"[Cover] FALLÓ: {origId}");
-                    failed++;
-                }
-            }
-
-            return $"Covers: {downloaded} desc, {skipped} existen, {failed} no encontrados.";
-        }
-
-        private async Task<bool> TryDownloadWithRetry(HttpClient client, string url, string dest, int maxRetries = 2)
-        {
-            for (int retry = 0; retry <= maxRetries; retry++)
-            {
-                try
-                {
-                    var res = await client.GetAsync(url);
-                    if (res.IsSuccessStatusCode)
-                    {
-                        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                        await using var fs = new FileStream(dest, FileMode.Create);
-                        await res.Content.CopyToAsync(fs);
-                        return true;
-                    }
-                    _log.Log($"[HTTP] {url} -> {(int)res.StatusCode}");
-                }
-                catch (Exception ex)
-                {
-                    _log.Log($"[HTTP][ERR] {ex.Message} (intento {retry + 1})");
-                }
-
-                if (retry < maxRetries)
-                    await Task.Delay(1000);  // Pequeño retardo antes de reintentar
-            }
-            return false;
-        }
-
-        // ==================== DIAGNÓSTICO ====================
-
-        public string GetDebugIds()
-        {
-            BuildCfgIndex();
-
-            var games = _listService.Ps1Games
-                .Take(5)
-                .Select(g => $"{g.Name} -> {g.OriginalGameId}");
-
-            var files = _cfgIndex.Keys.Take(5);
-
-            return $"🎮 Juegos:\n{string.Join("\n", games)}\n\n📄 CFGs en caché:\n{string.Join("\n", files)}";
-        }
-
         // ==================== AUXILIARES ====================
-
         private static bool TestWrite(string folder)
         {
             try
