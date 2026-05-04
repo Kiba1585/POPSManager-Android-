@@ -42,6 +42,16 @@ public class ProcessPopsViewModel : BindableObject
         }
     }
 
+    // Panel de cheats colapsable
+    private bool _isCheatsExpanded = false;
+    public bool IsCheatsExpanded
+    {
+        get => _isCheatsExpanded;
+        set => SetProperty(ref _isCheatsExpanded, value);
+    }
+
+    public ICommand ToggleCheatsCommand { get; }
+
     private bool _isUpdateModeIndividual = true;
     public bool IsUpdateModeIndividual
     {
@@ -100,6 +110,7 @@ public class ProcessPopsViewModel : BindableObject
         OpenStorageSettingsCommand = new Command(OpenStorageSettings);
         UpdateDatabaseCommand = new Command(async () => await UpdateDatabase());
         DebugIdsCommand = new Command(() => Status = _assetService.GetDebugIds());
+        ToggleCheatsCommand = new Command(() => IsCheatsExpanded = !IsCheatsExpanded);
 
         RefreshFromSettings();
     }
