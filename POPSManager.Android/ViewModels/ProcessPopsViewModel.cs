@@ -21,10 +21,26 @@ public class ProcessPopsViewModel : BindableObject
     public ObservableCollection<GameItem> AppsGames => _listService.AppsGames;
 
     private bool _cheatWidescreen, _cheatNoPal, _cheatFixSound, _cheatFixGraphics;
+    private int _cheatYPos = 0;
+
     public bool CheatWidescreen { get => _cheatWidescreen; set => SetProperty(ref _cheatWidescreen, value); }
     public bool CheatNoPal { get => _cheatNoPal; set => SetProperty(ref _cheatNoPal, value); }
     public bool CheatFixSound { get => _cheatFixSound; set => SetProperty(ref _cheatFixSound, value); }
     public bool CheatFixGraphics { get => _cheatFixGraphics; set => SetProperty(ref _cheatFixGraphics, value); }
+
+    public int CheatYPos
+    {
+        get => _cheatYPos;
+        set
+        {
+            value = Math.Clamp(value, -50, 50);
+            if (_cheatYPos != value)
+            {
+                _cheatYPos = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     private bool _isUpdateModeIndividual = true;
     public bool IsUpdateModeIndividual
@@ -62,7 +78,7 @@ public class ProcessPopsViewModel : BindableObject
     public ICommand RenameAllCommand { get; }
     public ICommand OpenStorageSettingsCommand { get; }
     public ICommand UpdateDatabaseCommand { get; }
-    public ICommand DebugIdsCommand { get; }   // ← NUEVO
+    public ICommand DebugIdsCommand { get; }
 
     public ProcessPopsViewModel(IPathsService paths, SettingsService settings,
         GameListService listService, GameProcessingService processingService, GameAssetService assetService)
@@ -83,7 +99,7 @@ public class ProcessPopsViewModel : BindableObject
         RenameAllCommand = new Command(async () => await RenameAllGames());
         OpenStorageSettingsCommand = new Command(OpenStorageSettings);
         UpdateDatabaseCommand = new Command(async () => await UpdateDatabase());
-        DebugIdsCommand = new Command(() => Status = _assetService.GetDebugIds());   // ← NUEVO
+        DebugIdsCommand = new Command(() => Status = _assetService.GetDebugIds());
 
         RefreshFromSettings();
     }
@@ -131,24 +147,26 @@ public class ProcessPopsViewModel : BindableObject
     private async Task CopyMetadata() =>
         Status = await _assetService.CopyMetadataAsync(ReportProgress);
 
-    private async Task ProcessAllGames()
-    {
-        if (!_listService.Ps1Games.Any() && !_listService.Ps2Games.Any()) { Status = "No hay juegos."; return; }
-        Status = await _processingService.GenerateAllElfsAsync();
-        Status = await _processingService.GenerateAllCheatsAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics);
-        await DownloadCovers();
-        await CopyMetadata();
-        Status = "Procesamiento completo.";
-    }
-
     private async Task GenerateAllElfs() =>
         Status = await _processingService.GenerateAllElfsAsync();
 
     private async Task GenerateAllCheats() =>
-        Status = await _processingService.GenerateAllCheatsAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics);
+        Status = await _processingService.GenerateAllCheatsAsync(
+            CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics, CheatYPos);
 
     private async Task RenameAllGames() =>
         Status = await _processingService.RenameAllAsync(CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics);
+
+    private async Task ProcessAllGames()
+    {
+        if (!_listService.Ps1Games.Any() && !_listService.Ps2Games.Any()) { Status = "No hay juegos."; return; }
+        Status = await _processingService.GenerateAllElfsAsync();
+        Status = await _processingService.GenerateAllCheatsAsync(
+            CheatWidescreen, CheatNoPal, CheatFixSound, CheatFixGraphics, CheatYPos);
+        await DownloadCovers();
+        await CopyMetadata();
+        Status = "Procesamiento completo.";
+    }
 
     private void OpenStorageSettings()
     {
