@@ -75,7 +75,7 @@ namespace POPSManager.Android.Services
                     Directory.Delete(internalDb, true);
                 Directory.CreateDirectory(internalCfg);
 
-                _log.Log($"[DB] Extrayendo a: {internalDb}");
+                _log.Log($"[DB] Extrayendo a caché interna: {internalDb}");
 
                 await Task.Run(() =>
                 {
@@ -133,7 +133,6 @@ namespace POPSManager.Android.Services
                 await Task.Run(() =>
                 {
                     using var archive = ZipFile.OpenRead(zipTemp);
-                    // Buscar archivos en carpeta cfg/ o mediante index.json
                     var indexEntry = archive.GetEntry("index.json");
                     if (indexEntry != null)
                     {
