@@ -22,6 +22,14 @@ namespace POPSManager.Android.Services
         private Dictionary<string, string> _cfgIndex = new(StringComparer.OrdinalIgnoreCase);
         private bool _indexBuilt = false;
 
+        // 🔥 MIRRORS DE COVERS (orden de prioridad)
+        private static readonly string[] CoverMirrors = new[]
+        {
+            "https://raw.githubusercontent.com/Luden02/oplm-art/main/ART",
+            "https://raw.githubusercontent.com/xlenore/psx-covers/main/covers",
+            "https://archive.org/download/oplm-art-2023-11/ART"  // fallback
+        };
+
         public GameAssetService(IPathsService paths, ILoggingService log,
             GameListService listService, DatabaseUpdaterService dbUpdater)
         {
@@ -89,7 +97,6 @@ namespace POPSManager.Android.Services
             {
                 _dbUpdater.SaveVersion(tag);
                 GameDatabase.Initialize(InternalDatabaseFolder);
-                // Reiniciar índice porque los CFG se han actualizado
                 _indexBuilt = false;
                 _cfgIndex.Clear();
                 return "Base de datos completa actualizada.";
@@ -189,7 +196,7 @@ namespace POPSManager.Android.Services
             return $"Metadatos: {copied} copiados, {skipped} existían, {notFound} no encontrados.";
         }
 
-        // ==================== COVERS ====================
+        // ==================== COVERS (CON MIRRORS ALTERNATIVOS) ====================
 
         public async Task<string> DownloadCoversAsync(Action<string> onProgress)
         {
@@ -200,9 +207,8 @@ namespace POPSManager.Android.Services
             if (!TestWrite(artFolder)) return $"❌ Sin permisos en ART:\n{artFolder}";
 
             int downloaded = 0, skipped = 0, failed = 0;
-            string mirror = "https://archive.org/download/oplm-art-2023-11/ART";
 
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
             for (int i = 0; i < all.Count; i++)
             {
@@ -222,15 +228,25 @@ namespace POPSManager.Android.Services
                     continue;
                 }
 
-                bool success =
-                    await TryDownload(client, $"{mirror}/{origId}.jpg", artFile) ||
-                    await TryDownload(client, $"{mirror}/{normId}.jpg", artFile);
+                bool success = false;
 
+                // Probar cada mirror con normId y origId
+                foreach (var mirrorBase in CoverMirrors)
+                {
+                    if (await TryDownloadWithRetry(client, $"{mirrorBase}/{normId}.jpg", artFile) ||
+                        await TryDownloadWithRetry(client, $"{mirrorBase}/{origId}.jpg", artFile))
+                    {
+                        success = true;
+                        break;
+                    }
+                }
+
+                // Si ningún mirror funcionó, probar base de datos local
                 if (!success)
                 {
                     string? dbUrl = GameDatabase.TryGetCoverUrl(origId);
                     if (!string.IsNullOrWhiteSpace(dbUrl))
-                        success = await TryDownload(client, dbUrl, artFile);
+                        success = await TryDownloadWithRetry(client, dbUrl, artFile);
                 }
 
                 if (success)
@@ -256,26 +272,31 @@ namespace POPSManager.Android.Services
             return $"Covers: {downloaded} desc, {skipped} existen, {failed} no encontrados.";
         }
 
-        private async Task<bool> TryDownload(HttpClient client, string url, string dest)
+        private async Task<bool> TryDownloadWithRetry(HttpClient client, string url, string dest, int maxRetries = 2)
         {
-            try
+            for (int retry = 0; retry <= maxRetries; retry++)
             {
-                var res = await client.GetAsync(url);
-                _log.Log($"[HTTP] {url} -> {(int)res.StatusCode}");
+                try
+                {
+                    var res = await client.GetAsync(url);
+                    if (res.IsSuccessStatusCode)
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                        await using var fs = new FileStream(dest, FileMode.Create);
+                        await res.Content.CopyToAsync(fs);
+                        return true;
+                    }
+                    _log.Log($"[HTTP] {url} -> {(int)res.StatusCode}");
+                }
+                catch (Exception ex)
+                {
+                    _log.Log($"[HTTP][ERR] {ex.Message} (intento {retry + 1})");
+                }
 
-                if (!res.IsSuccessStatusCode)
-                    return false;
-
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                await using var fs = new FileStream(dest, FileMode.Create);
-                await res.Content.CopyToAsync(fs);
-                return true;
+                if (retry < maxRetries)
+                    await Task.Delay(1000);  // Pequeño retardo antes de reintentar
             }
-            catch (Exception ex)
-            {
-                _log.Log($"[HTTP][ERR] {ex.Message}");
-                return false;
-            }
+            return false;
         }
 
         // ==================== DIAGNÓSTICO ====================
