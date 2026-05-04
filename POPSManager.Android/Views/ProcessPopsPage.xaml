@@ -31,22 +31,37 @@
             <Frame Style="{StaticResource CardFrame}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="🎮 Opciones de cheats" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+
                     <HorizontalStackLayout Spacing="10">
                         <Switch IsToggled="{Binding CheatWidescreen}" OnColor="{StaticResource AccentBlue}" />
                         <Label Text="Widescreen" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" />
                     </HorizontalStackLayout>
+
                     <HorizontalStackLayout Spacing="10">
                         <Switch IsToggled="{Binding CheatNoPal}" OnColor="{StaticResource AccentBlue}" />
                         <Label Text="Desactivar PAL ($NOPAL)" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" />
                     </HorizontalStackLayout>
+
                     <HorizontalStackLayout Spacing="10">
                         <Switch IsToggled="{Binding CheatFixSound}" OnColor="{StaticResource AccentBlue}" />
                         <Label Text="Arreglar sonido" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" />
                     </HorizontalStackLayout>
+
                     <HorizontalStackLayout Spacing="10">
                         <Switch IsToggled="{Binding CheatFixGraphics}" OnColor="{StaticResource AccentBlue}" />
                         <Label Text="Arreglar gráficos" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" />
                     </HorizontalStackLayout>
+
+                    <!-- Ajuste vertical de pantalla ($YPOS) -->
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="Ajuste vertical de pantalla (YPOS):" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+                        <Grid ColumnDefinitions="*,60">
+                            <Slider Minimum="-50" Maximum="50" Value="{Binding CheatYPos}"
+                                    ThumbColor="{StaticResource AccentBlue}" MinimumTrackColor="{StaticResource AccentBlue}" />
+                            <Label Grid.Column="1" Text="{Binding CheatYPos, StringFormat='{0}'}" VerticalOptions="Center"
+                                   HorizontalTextAlignment="Center" TextColor="{StaticResource TextPrimary}" />
+                        </Grid>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </Frame>
 
@@ -75,6 +90,8 @@
                 <Label Text="Solo juegos detectados" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}" />
             </HorizontalStackLayout>
             <Button Text="📦 Actualizar DB" Command="{Binding UpdateDatabaseCommand}"
+                    Style="{StaticResource SecondaryButton}" />
+            <Button Text="🔍 Depurar IDs" Command="{Binding DebugIdsCommand}"
                     Style="{StaticResource SecondaryButton}" />
 
             <!-- Estado -->
