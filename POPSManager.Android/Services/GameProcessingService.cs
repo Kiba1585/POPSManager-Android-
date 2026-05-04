@@ -139,8 +139,8 @@ namespace POPSManager.Android.Services
             return generated > 0 ? $"{generated} ELFs generados. {skipped} ya existían." : $"No se generaron ELFs. {skipped} ya existían.";
         }
 
-        // ==================== GENERAR CHEATS ====================
-        public async Task<string> GenerateAllCheatsAsync(bool widescreen, bool nopal, bool fixSound, bool fixGraphics)
+        // ==================== GENERAR CHEATS (CON $YPOS) ====================
+        public async Task<string> GenerateAllCheatsAsync(bool widescreen, bool nopal, bool fixSound, bool fixGraphics, int ypos = 0)
         {
             var extra = new List<string>();
             if (widescreen) extra.Add("WIDESCREEN=ON");
@@ -148,24 +148,38 @@ namespace POPSManager.Android.Services
             if (fixSound) extra.Add("FIXSOUND=ON");
             if (fixGraphics) extra.Add("FIXGRAPHICS=ON");
 
+            // $YPOS para ajuste vertical de pantalla
+            if (ypos != 0)
+            {
+                string yposLine = ypos > 0 ? $"$YPOS_{ypos}" : $"$YPOS_{ypos}";
+                extra.Add(yposLine);
+            }
+
             int gen = 0, skip = 0;
             foreach (var g in _listService.Ps1Games)
             {
                 try
                 {
-                    // Asegurar que la carpeta existe antes de escribir
                     Directory.CreateDirectory(g.GameFolder);
                     string cheat = Path.Combine(g.GameFolder, "CHEAT.TXT");
-                    if (!File.Exists(cheat))
-                    {
-                        CheatGenerator.GenerateCheatTxt(g.OriginalGameId, g.GameFolder, extra, msg => _log.Log(msg));
-                        gen++;
-                        _log.Log($"[Cheats] Generado en {cheat}");
-                    }
-                    else
+
+                    if (File.Exists(cheat))
                     {
                         _log.Log($"[Cheats] Ya existe: {cheat}");
                         skip++;
+                        continue;
+                    }
+
+                    CheatGenerator.GenerateCheatTxt(g.OriginalGameId, g.GameFolder, extra, msg => _log.Log(msg));
+
+                    if (File.Exists(cheat))
+                    {
+                        gen++;
+                        _log.Log($"[Cheats] Generado OK: {cheat}");
+                    }
+                    else
+                    {
+                        _log.Log($"[Cheats] ERROR: no se pudo crear {cheat} (posiblemente juego NTSC)");
                     }
                 }
                 catch (Exception ex)
