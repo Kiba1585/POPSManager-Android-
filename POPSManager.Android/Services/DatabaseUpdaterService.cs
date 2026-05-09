@@ -31,7 +31,6 @@ namespace POPSManager.Android.Services
             _log = log;
         }
 
-        /// <summary> Comprueba si hay una nueva versión. </summary>
         public async Task<(bool newAvailable, string? tag)> CheckForUpdateAsync()
         {
             try
@@ -56,6 +55,13 @@ namespace POPSManager.Android.Services
 
         public void SaveVersion(string tag) => Preferences.Set(VersionKey, tag);
 
+        public bool IsCacheValid()
+        {
+            string cfgFolder = Path.Combine(InternalDatabaseFolder, "CFG");
+            if (!Directory.Exists(cfgFolder)) return false;
+            return Directory.GetFiles(cfgFolder, "*.cfg", SearchOption.AllDirectories).Length > 0;
+        }
+
         // ==================== MODO COMPLETO ====================
         public async Task<bool> DownloadFullDatabaseAsync(Action<string> onProgress)
         {
@@ -70,7 +76,6 @@ namespace POPSManager.Android.Services
                 string internalDb = InternalDatabaseFolder;
                 string internalCfg = Path.Combine(internalDb, "CFG");
 
-                // Limpiar y recrear carpeta interna
                 if (Directory.Exists(internalDb))
                     Directory.Delete(internalDb, true);
                 Directory.CreateDirectory(internalCfg);
@@ -80,23 +85,34 @@ namespace POPSManager.Android.Services
                 await Task.Run(() =>
                 {
                     using var archive = ZipFile.OpenRead(zipTemp);
+                    _log.Log($"[DB] Entradas ZIP: {archive.Entries.Count}");
+
                     foreach (var entry in archive.Entries)
                     {
-                        if (entry.FullName.StartsWith("CFG/") && entry.FullName.EndsWith(".cfg"))
+                        _log.Log($"[ZIP] {entry.FullName}");
+
+                        // Aceptar cfg/ o CFG/ (case‑insensitive)
+                        if (entry.FullName.Replace("\\", "/")
+                                .StartsWith("cfg/", StringComparison.OrdinalIgnoreCase)
+                            && entry.FullName.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase))
                         {
                             string destPath = Path.Combine(internalCfg, entry.Name);
                             entry.ExtractToFile(destPath, true);
                         }
-                        else if (entry.FullName == "ps1db.json" || entry.FullName == "ps2db.json")
+                        else if (entry.FullName.Equals("ps1db.json", StringComparison.OrdinalIgnoreCase)
+                              || entry.FullName.Equals("ps2db.json", StringComparison.OrdinalIgnoreCase))
                         {
-                            string destPath = Path.Combine(internalDb, entry.Name);
+                            string destPath = Path.Combine(internalDb, Path.GetFileName(entry.Name));
                             entry.ExtractToFile(destPath, true);
                         }
                     }
                 });
 
+                int cfgCount = Directory.GetFiles(internalCfg, "*.cfg", SearchOption.AllDirectories).Length;
+                _log.Log($"[DB] CFGs extraídos: {cfgCount}");
+                onProgress($"Base de datos instalada ({cfgCount} CFGs).");
+
                 File.Delete(zipTemp);
-                onProgress("Base de datos completa instalada.");
                 return true;
             }
             catch (Exception ex)
@@ -161,7 +177,10 @@ namespace POPSManager.Android.Services
                     {
                         foreach (var entry in archive.Entries)
                         {
-                            if (entry.FullName.StartsWith("cfg/") && entry.FullName.EndsWith(".cfg"))
+                            // Buscar en cfg/ (case‑insensitive)
+                            if (entry.FullName.Replace("\\", "/")
+                                    .StartsWith("cfg/", StringComparison.OrdinalIgnoreCase)
+                                && entry.FullName.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase))
                             {
                                 string id = Path.GetFileNameWithoutExtension(entry.Name);
                                 if (gameIdSet.Contains(id))
