@@ -1,24 +1,20 @@
-name: Limpiar artefactos y cachés antiguos
+name: Limpiar artefactos antiguos
 
 on:
   schedule:
     - cron: '0 4 * * 0'   # Cada domingo a las 04:00 UTC
-  workflow_dispatch:      # También se puede ejecutar manualmente
+  workflow_dispatch:
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write          # Permiso necesario para borrar artefactos
     steps:
       - name: Eliminar artefactos antiguos
-        uses: actions/delete-artifacts@v1
+        uses: c-hive/gha-remove-artifacts@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repo: ${{ github.repository }}
-          older-than: 7 days   # Borra los que tengan más de 7 días
-          
-      - name: Limpiar cachés de NuGet y otros
-        run: |
-          # Borrar todas las cachés de GitHub Actions
-          gh cache delete --all --repo ${{ github.repository }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          age: '7 days'       # Borra los que tengan más de 7 días
+          skip-tags: true     # No borra artefactos de releases
+          skip-recent: 3      # Conserva los 3 más recientes
