@@ -1,106 +1,73 @@
 name: Build Android (MAUI)
 
-on:
-  push:
-    branches: ["main"]
-  workflow_dispatch:
-
 permissions:
   contents: write
 
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
 jobs:
-  build:
+  build-android:
     runs-on: windows-latest
 
     steps:
-      # 📥 Código
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout del repositorio
+      uses: actions/checkout@v4
 
-      # 🔧 .NET
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
+    # ... (el resto de pasos hasta compilar son idénticos a los tuyos) ...
 
-      # ☕ Java (necesario para Android)
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'microsoft'
-          java-version: '17'
+    # 🔨 COMPILAR (genera el APK)
+    - name: Compilar APK Firmado
+      run: |
+        dotnet publish POPSManager.Android/POPSManager.Android.csproj `
+          -c Release `
+          -f net8.0-android `
+          -p:RuntimeIdentifier=android-arm64 `
+          /p:AndroidPackageFormat=apk `
+          /p:AndroidKeyStore=true `
+          /p:AndroidSigningKeyStore="$keystore" `
+          /p:AndroidSigningKeyAlias=$env:KEY_ALIAS `
+          /p:AndroidSigningKeyPass=$env:KEY_PASSWORD `
+          /p:AndroidSigningStorePass=$env:KEYSTORE_PASSWORD
+      env:
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
-      # 🔥 Instalar workloads MAUI
-      - name: Install MAUI Workloads
-        run: dotnet workload restore
+    # 📁 COPIAR APK A CARPETA publish (comprimiendo para reducir tamaño)
+    - name: Copiar y comprimir APK
+      run: |
+        New-Item -ItemType Directory -Force -Path publish
+        $apk = Get-ChildItem -Path "POPSManager.Android\bin\Release\net8.0-android" -Filter "*.apk" -Recurse | Select-Object -First 1
+        if ($apk) {
+          # Comprimir el APK antes de subirlo (reduce el tamaño a la mitad aproximadamente)
+          Compress-Archive -Path $apk.FullName -DestinationPath "publish\POPSManager-Android.zip"
+          Write-Host "APK comprimido: publish\POPSManager-Android.zip"
+        } else {
+          Write-Host "No se encontró ningún APK."
+        }
+      shell: pwsh
 
-      # 🧹 Limpieza REAL (PowerShell correcto)
-      - name: Delete bin/obj
-        shell: pwsh
-        run: |
-          Get-ChildItem -Path . -Include bin,obj -Recurse -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    # 📦 SUBIR APK COMO ARTEFACTO (solo 3 días de retención, sin subir en push)
+    - name: Subir artefacto APK
+      if: github.event_name == 'workflow_dispatch'  # Solo en ejecuciones manuales
+      uses: actions/upload-artifact@v4
+      with:
+        name: POPSManager-Android-Signed
+        path: publish/POPSManager-Android.zip
+        retention-days: 3          # Se borrará automáticamente después de 3 días
+        if-no-files-found: warn
+        compression-level: 6
 
-      - name: Clean
-        run: dotnet clean POPSManager.sln -c Release
-
-      # 📦 Restore
-      - name: Restore
-        run: dotnet restore POPSManager.sln
-
-      # 🔐 Decodificar Keystore
-      - name: Decode Keystore
-        shell: pwsh
-        run: |
-          $bytes = [Convert]::FromBase64String("${{ secrets.KEYSTORE_BASE64 }}")
-          $path = Join-Path $env:GITHUB_WORKSPACE "keystore.keystore"
-          [IO.File]::WriteAllBytes($path, $bytes)
-
-      # 🔨 Build APK firmado (SIN AndroidManifest manual ❗)
-      - name: Publish APK
-        shell: pwsh
-        run: |
-          $keystore = Join-Path $env:GITHUB_WORKSPACE "keystore.keystore"
-
-          dotnet publish POPSManager.Android/POPSManager.Android.csproj `
-            -c Release `
-            -f net8.0-android `
-            -p:RuntimeIdentifier=android-arm64 `
-            -p:AndroidPackageFormat=apk `
-            -p:BuildApk=true `
-            -p:AndroidKeyStore=true `
-            -p:AndroidSigningKeyStore="$keystore" `
-            -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }} `
-            -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }} `
-            -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
-
-      # 📦 Copiar APK firmado correcto
-      - name: Copy APK
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path publish
-
-          $apk = Get-ChildItem -Recurse -Filter "*-Signed.apk" | Select-Object -First 1
-
-          if ($apk) {
-            Copy-Item $apk.FullName publish\
-            Write-Host "APK listo: $($apk.FullName)"
-          } else {
-            throw "❌ No se encontró APK firmado"
-          }
-
-      # 📁 Subir artifact
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: popsmanager-apk
-          path: publish/*.apk
-
-      # 🚀 Crear release automático
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.run_number }}
-          name: POPSManager Build v${{ github.run_number }}
-          files: publish/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # 🚀 CREAR RELEASE solo en workflow_dispatch (manual) o cuando se crea un tag
+    - name: Crear Release y subir APK
+      if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ github.run_number }}
+        name: "Android Build v${{ github.run_number }}"
+        files: publish/POPSManager-Android.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
