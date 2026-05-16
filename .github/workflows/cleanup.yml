@@ -1,20 +1,16 @@
-name: Limpiar artefactos antiguos
-
+name: Delete old workflow runs
 on:
   schedule:
-    - cron: '0 4 * * 0'   # Cada domingo a las 04:00 UTC
-  workflow_dispatch:
+    - cron: '0 0 * * *' # Ejecutar diariamente a las 00:00 UTC
+  workflow_dispatch:     # Permite ejecución manual
 
 jobs:
-  cleanup:
+  delete-runs:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: write          # Permiso necesario para borrar artefactos
     steps:
-      - name: Eliminar artefactos antiguos
-        uses: c-hive/gha-remove-artifacts@v1
+      - uses: actions/checkout@v4
+      - uses: yanovation/delete-old-actions@v1
         with:
-          age: '7 days'       # Borra los que tengan más de 7 días
-          skip-tags: true     # No borra artefactos de releases
-          skip-recent: 3      # Conserva los 3 más recientes
+          token: ${{ secrets.GITHUB_TOKEN }}
+          days-ago: 30        # Eliminar runs de más de 30 días
+          keep-latest: 5       # Pero siempre mantener los últimos 5 runs
